@@ -32,6 +32,13 @@ class Progression {
     return unlocked;
   }
 
+  /// 새로 숙달된 단 목록 — 복습 카드는 어느 세계 세션에든 섞여 나오므로
+  /// 현재 단만 검사하면 다른 단의 숙달 달성을 놓친다
+  static List<int> newlyMastered(List<int> alreadyMastered, List<FactCard> deck) =>
+      danUnlockOrder
+          .where((d) => !alreadyMastered.contains(d) && isMastered(d, deck))
+          .toList();
+
   /// 단 진행률 0.0~1.0 (홈 카드 중 1회 이상 맞힌 비율)
   static double progress(int dan, List<FactCard> deck) {
     final cards = homeCards(dan, deck);

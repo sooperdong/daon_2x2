@@ -13,7 +13,7 @@ class ResultScreen extends StatelessWidget {
   final int total;
   final int xpGained;
   final int levelUps;
-  final bool newMastery;
+  final List<int> newMasteries;
   final bool streakTicket;
 
   const ResultScreen({
@@ -24,7 +24,7 @@ class ResultScreen extends StatelessWidget {
     required this.total,
     required this.xpGained,
     required this.levelUps,
-    required this.newMastery,
+    required this.newMasteries,
     required this.streakTicket,
   });
 
@@ -50,7 +50,8 @@ class ResultScreen extends StatelessWidget {
                 _rewardRow('⭐', '별 조각 +$starPiecesPerSession'),
                 if (levelUps > 0)
                   _rewardRow('🎉', '레벨 업! 김다조이가 레벨 ${repo.profile.level}이 되었어!'),
-                if (newMastery) _rewardRow('👑', '$dan단 마스터! 룰렛 티켓 +1'),
+                for (final masteredDan in newMasteries)
+                  _rewardRow('👑', '$masteredDan단 마스터! 룰렛 티켓 +1'),
                 if (streakTicket)
                   _rewardRow('🔥', '${repo.profile.streak}일 연속 학습! 룰렛 티켓 +1'),
                 const SizedBox(height: 24),

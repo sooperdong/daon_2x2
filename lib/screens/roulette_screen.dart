@@ -27,6 +27,7 @@ class _RouletteScreenState extends State<RouletteScreen>
 
   RoulettePrize? _result;
   bool _spinning = false;
+  double _baseAngle = 0; // 직전 스핀의 정지 각도 — 다음 스핀이 0도로 튕기지 않게
 
   // 휠 섹터: 꽝 180°(50%) / 100원 144°(40%) / 1000원 36°(10%)
   static const _sectors = [
@@ -72,11 +73,12 @@ class _RouletteScreenState extends State<RouletteScreen>
       _result = null;
     });
 
-    _rotation = Tween<double>(begin: 0, end: endAngle).animate(
+    _rotation = Tween<double>(begin: _baseAngle, end: endAngle).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart),
     );
     _controller.reset();
     await _controller.forward();
+    _baseAngle = endAngle % (2 * math.pi);
 
     final repo = widget.repo;
     final profile = repo.profile;

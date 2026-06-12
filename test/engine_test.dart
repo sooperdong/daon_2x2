@@ -157,6 +157,20 @@ void main() {
       expect(Progression.unlockedDans(deck), [2, 5]);
     });
 
+    test('newlyMastered: 어느 단이든 새로 숙달되면 감지 (현재 단 한정 X)', () {
+      final deck = FactCard.buildDeck();
+      // 2단과 5단을 동시에 숙달 상태로
+      for (final dan in [2, 5]) {
+        for (final c in Progression.homeCards(dan, deck)) {
+          c.consecutiveCorrect = masteryConsecutive;
+        }
+      }
+      // 2단은 이미 기록됨 → 5단만 새로 감지
+      expect(Progression.newlyMastered([2], deck), [5]);
+      expect(Progression.newlyMastered([], deck), [2, 5]);
+      expect(Progression.newlyMastered([2, 5], deck), isEmpty);
+    });
+
     test('숙달: 홈 카드 전부 연속 3회 정답', () {
       final deck = FactCard.buildDeck();
       final home = Progression.homeCards(2, deck);

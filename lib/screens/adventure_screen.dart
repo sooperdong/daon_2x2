@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/constants.dart';
 import '../data/models/fact_card.dart';
 import '../data/game_repository.dart';
+import '../engine/progression.dart';
 import '../engine/question_generator.dart';
 import '../engine/sm2_scheduler.dart';
 import '../widgets/dajoy_character.dart';
@@ -49,6 +50,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
   List<int> _choices = [];
   String _typed = '';
   bool? _lastCorrect;
+  bool _flipped = false; // 문제당 1회 결정 — build에서 재추첨하면 입력 중 화면이 바뀐다
   DajoyExpression _expression = DajoyExpression.focus;
 
   WorldInfo get _world => worlds[widget.dan]!;
@@ -65,7 +67,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
     _totalQuestions = _queue.length;
     _monsterMaxHp = _queue.length;
     _monsterHp = _monsterMaxHp;
-    _next();
+    if (_queue.isNotEmpty) _next();
   }
 
   void _next() {
@@ -78,6 +80,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
       _current = card;
       _typed = '';
       _lastCorrect = null;
+      _flipped = card.a != card.b && _rng.nextBool(); // 교환법칙 노출: 절반 확률로 뒤집어 출제
       _expression = DajoyExpression.focus;
       // 처음 보는 카드는 암송 카드부터 (부호화 단계)
       if (card.isNew && !_attempted.contains(card.id) && !_shielded.contains(card.id)) {
@@ -147,16 +150,10 @@ class _AdventureScreenState extends State<AdventureScreen> {
     final streakTicket = profile.recordPlayToday(DateTime.now());
     if (streakTicket) profile.rouletteTickets++;
 
-    // 단 마스터 신규 달성 체크 → 룰렛 티켓
-    var newMastery = false;
-    if (!profile.masteredDans.contains(widget.dan) &&
-        repo.deck
-            .where((c) => c.homeDan == widget.dan)
-            .every((c) => c.consecutiveCorrect >= masteryConsecutive)) {
-      profile.masteredDans.add(widget.dan);
-      profile.rouletteTickets++;
-      newMastery = true;
-    }
+    // 단 마스터 신규 달성 체크 → 룰렛 티켓 (복습 카드로 다른 단이 숙달될 수도 있음)
+    final newMasteries = Progression.newlyMastered(profile.masteredDans, repo.deck);
+    profile.masteredDans.addAll(newMasteries);
+    profile.rouletteTickets += newMasteries.length;
 
     await repo.saveProfile();
     await repo.logEvent('session', {
@@ -175,7 +172,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
           total: _totalQuestions,
           xpGained: xpGained,
           levelUps: levelUps,
-          newMastery: newMastery,
+          newMasteries: newMasteries,
           streakTicket: streakTicket,
         ),
       ),
@@ -184,6 +181,33 @@ class _AdventureScreenState extends State<AdventureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 빈 세션: 복습 만기 카드도, 새 카드도 없음 — 보상 없이 안내만.
+    // 그냥 완료 처리하면 클리어한 세계를 반복 탭해서 XP를 무한 파밍할 수 있다.
+    if (_totalQuestions == 0) {
+      return Scaffold(
+        appBar: AppBar(title: Text('${_world.emoji} ${_world.name}')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const DajoyCharacter(expression: DajoyExpression.happy, size: 120),
+              const SizedBox(height: 16),
+              const Text('오늘은 여기서 복습할 마법이 없어!',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('다른 세계를 탐험하거나 내일 다시 와줘 ✨',
+                  style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('지도로 돌아가기'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final card = _current;
     if (card == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
@@ -281,10 +305,8 @@ class _AdventureScreenState extends State<AdventureScreen> {
   }
 
   Widget _buildQuestion(FactCard card) {
-    // 교환법칙 노출: 절반 확률로 뒤집어 출제
-    final flip = _rng.nextBool();
-    final left = flip ? card.b : card.a;
-    final right = flip ? card.a : card.b;
+    final left = _flipped ? card.b : card.a;
+    final right = _flipped ? card.a : card.b;
 
     return Column(
       children: [
@@ -370,6 +392,9 @@ class _AdventureScreenState extends State<AdventureScreen> {
   Widget _buildFeedback(FactCard card) {
     final correct = _lastCorrect ?? false;
     final praise = ['완벽해!', '천재인데?', '우와, 대단해!', '멋지다!'][_rng.nextInt(4)];
+    // 문제와 같은 방향으로 정답 표시 — 방향이 바뀌면 아이가 헷갈린다
+    final left = _flipped ? card.b : card.a;
+    final right = _flipped ? card.a : card.b;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -377,7 +402,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
           Text(correct ? '⚡ 공격 성공!' : '🛡️ 몬스터가 방어막을 쳤어!',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          Text('${card.a} × ${card.b} = ${card.answer}',
+          Text('$left × $right = ${card.answer}',
               style: TextStyle(
                 fontSize: 40,
                 fontWeight: FontWeight.bold,
