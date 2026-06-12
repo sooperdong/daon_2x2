@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Firebase 콘솔 → Firestore Database → 규칙 탭에 붙여넣고 "게시"
+//
+// 테스트 모드 기본 규칙은 30일 후 만료되므로 반드시 이 규칙으로 교체할 것.
+// 가족 코드(추측 불가능한 6자리)가 곧 접근 키 역할:
+//   - 코드를 아는 기기만 해당 문서 경로에 접근 가능
+//   - list 금지로 가족 코드 목록 열람(열거) 차단
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /families/{family} {
+      allow get, create, update: if true;
+      allow list, delete: if false;
+
+      match /events/{event} {
+        allow get, create: if true;
+        allow list: if true;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

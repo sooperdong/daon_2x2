@@ -74,6 +74,27 @@ class GameRepository {
     await _events.add(jsonEncode({'type': type, ...data, 'at': at.toIso8601String()}));
   }
 
+  // ── 동기화 지원 ─────────────────────────────────────────────────────────
+
+  /// 마지막 동기화 이후 추가된 이벤트 (Hive auto-increment 키 기준)
+  List<String> get unsyncedEvents {
+    final upTo = int.tryParse(_profile.get('syncedUpTo') ?? '') ?? -1;
+    return [
+      for (final key in _events.keys)
+        if ((key as int) > upTo) _events.get(key)!,
+    ];
+  }
+
+  Future<void> markEventsSynced() async {
+    if (_events.isEmpty) return;
+    final maxKey = _events.keys.cast<int>().reduce((a, b) => a > b ? a : b);
+    await _profile.put('syncedUpTo', '$maxKey');
+  }
+
+  /// 동기화 메타데이터 (3-way 병합 기준점 등)
+  String? getMeta(String key) => _profile.get(key);
+  Future<void> setMeta(String key, String value) => _profile.put(key, value);
+
   // ── 부모 리포트용 통계 집계 ────────────────────────────────────────────
 
   /// 단별 [총 시도, 총 정답] 집계 (첫 시도만 포함)

@@ -354,13 +354,19 @@ class _ParentScreenState extends State<ParentScreen> {
 
   Future<void> _syncNow() async {
     setState(() => _syncBusy = true);
-    await widget.sync.push(widget.repo);
-    await widget.sync.pull(widget.repo);
-    setState(() => _syncBusy = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('동기화 완료!')));
+    var ok = true;
+    try {
+      // 먼저 받아서 병합한 뒤, 병합 결과를 업로드
+      await widget.sync.pull(widget.repo);
+      await widget.sync.push(widget.repo);
+    } catch (_) {
+      ok = false;
     }
+    if (!mounted) return;
+    setState(() => _syncBusy = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? '동기화 완료!' : '동기화 실패 — 인터넷 연결을 확인해주세요')),
+    );
   }
 
   Future<void> _resetPiggyBank() async {

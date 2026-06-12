@@ -40,7 +40,11 @@ lib/
 │   ├── progression.dart       # 숙달/해금 판정
 │   ├── roulette.dart          # 확률 보상
 │   └── star_catch.dart        # 별 수집 모드 규칙
-├── screens/                   # 홈(세계 지도), 탐험, 결과, 룰렛, 상점, 별 수집
+├── screens/                   # 홈(세계 지도), 탐험, 결과, 룰렛, 상점, 별 수집, 부모 리포트
+├── services/
+│   ├── tts_service.dart       # 한국어 TTS — 암송 카드 자동 낭독
+│   ├── sync_service.dart      # 동기화 추상 인터페이스 (+ NoOp 기본 구현)
+│   └── firebase_sync.dart     # Firestore 가족 코드 동기화 (3-way 병합)
 └── widgets/dajoy_character.dart # 김다조이 캐릭터 (CustomPainter, 표정 4종 + 꾸미기)
 ```
 
@@ -56,7 +60,26 @@ flutter run        # Android 기기/에뮬레이터
 
 - **Phase 1**: 핵심 학습 루프 + 룰렛 + 저금통 ✅
 - **Phase 2**: 캐릭터 꾸미기 상점 + 별 수집 모드(선택형 보너스 게임) ✅
-- **Phase 3**: Firebase 기기 간 동기화(가족 코드), 부모 리포트, TTS
+- **Phase 3**: Firebase 기기 간 동기화(가족 코드), 부모 리포트, TTS ✅
+
+## Phase 3 기능
+
+- **TTS 암송**: 새 마법(카드)을 배울 때 "이 삼은 육"을 한국어 음성으로 낭독
+- **부모 리포트**: 홈 화면 "레벨 N 수학 마법사" 글씨를 3번 탭 → 4자리 PIN 설정/입력
+  - 30일 출석 달력, 단별 정답률 차트, 저금통 잔액·당첨 내역, 지급 완료(초기화) 버튼
+- **기기 동기화 (태블릿 ↔ 폰)**:
+  1. 기기 A: 부모 리포트 → 기기 동기화 → "새 코드 생성" → 6자리 코드 확인
+  2. 기기 B: 같은 메뉴에서 그 코드 입력 → "코드 연결"
+  3. 이후 앱 시작 시 자동 동기화 + "지금 동기화" 버튼으로 수동 동기화
+  - 병합 규칙: 별/저금통은 기기별 적립분 합산(3-way), 스트릭·최고점수는 max,
+    출석·숙달·소장품은 합집합, 카드 학습 상태는 더 많이 진행한 기기 우선
+
+## Firebase 설정 (완료된 상태)
+
+- 프로젝트: `daon-2x2` / 패키지명: `com.example.daon_2x2`
+- `android/app/google-services.json` 필요 (저장소에 포함)
+- **Firestore 보안 규칙**: 테스트 모드는 30일 후 만료되므로
+  Firebase 콘솔 → Firestore Database → 규칙 탭에 `firestore.rules` 내용을 붙여넣고 게시할 것
 
 ### 별 수집 모드 설계 노트
 

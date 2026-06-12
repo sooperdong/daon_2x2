@@ -43,11 +43,7 @@ String generateFamilyCode() {
   return List.generate(6, (_) => chars[rng.nextInt(chars.length)]).join();
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Firebase 구현 — pubspec.yaml 에서 firebase_core / cloud_firestore 주석 해제 후
-// 아래 파일의 주석을 풀면 활성화된다.
-// lib/services/firebase_sync.dart 참고
-// ──────────────────────────────────────────────────────────────────────────────
+// Firebase 구현: lib/services/firebase_sync.dart (FirebaseSyncService)
 
 /// 두 기기가 독립적으로 플레이한 이벤트 로그를 시간순 병합.
 /// 답안 이벤트는 SM-2에 재반영하지 않고 통계 집계에만 쓴다.

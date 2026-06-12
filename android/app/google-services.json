@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "391730486263",
+    "project_id": "daon-2x2",
+    "storage_bucket": "daon-2x2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:391730486263:android:0de750c697f0238b38acf2",
+        "android_client_info": {
+          "package_name": "com.example.daon_2x2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3CKwLtWS1wrFETeQ0s3FAdYigemd_4LY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
