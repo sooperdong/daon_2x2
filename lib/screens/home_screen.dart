@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import '../core/constants.dart';
 import '../data/game_repository.dart';
 import '../engine/progression.dart';
+import '../engine/star_catch.dart';
 import '../widgets/dajoy_character.dart';
 import 'adventure_screen.dart';
 import 'roulette_screen.dart';
+import 'shop_screen.dart';
+import 'star_catch_screen.dart';
 
 /// 메인 화면 — 김다조이 + 세계 지도.
 /// SDT 자율성 원칙: 어떤 세계에 갈지 아이가 직접 선택한다.
@@ -33,6 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildHeader(profile.level, profile.xp, profile.xpForNextLevel),
             _buildStats(),
             const SizedBox(height: 8),
+            _buildModeButtons(),
+            const SizedBox(height: 4),
             Expanded(
               child: GridView.count(
                 padding: const EdgeInsets.all(16),
@@ -62,7 +67,11 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
         children: [
-          const DajoyCharacter(expression: DajoyExpression.happy, size: 88),
+          DajoyCharacter(
+            expression: DajoyExpression.happy,
+            size: 88,
+            style: styleFromProfile(repo.profile),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -111,6 +120,38 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildModeButtons() {
+    final starCatchOpen = StarCatch.unlocked(repo.deck);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: FilledButton.tonal(
+              onPressed: () => _push(ShopScreen(repo: repo)),
+              child: const Text('🛍️ 꾸미기 상점', style: TextStyle(fontSize: 15)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: FilledButton.tonal(
+              onPressed: starCatchOpen ? () => _push(StarCatchScreen(repo: repo)) : null,
+              child: Text(
+                starCatchOpen ? '🌠 별 수집' : '🌠 별 수집 (마법 4개 배우면 열려!)',
+                style: const TextStyle(fontSize: 15),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _push(Widget screen) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+    setState(() {});
   }
 
   Future<void> _enterWorld(int dan) async {

@@ -3,12 +3,14 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:daon_2x2/core/constants.dart';
+import 'package:daon_2x2/core/shop_items.dart';
 import 'package:daon_2x2/data/models/fact_card.dart';
 import 'package:daon_2x2/data/models/profile.dart';
 import 'package:daon_2x2/engine/progression.dart';
 import 'package:daon_2x2/engine/question_generator.dart';
 import 'package:daon_2x2/engine/roulette.dart';
 import 'package:daon_2x2/engine/sm2_scheduler.dart';
+import 'package:daon_2x2/engine/star_catch.dart';
 
 void main() {
   group('FactCard 덱', () {
@@ -237,6 +239,96 @@ void main() {
       // 하루 건너뛰면 리셋
       p.recordPlayToday(DateTime(2026, 6, 9));
       expect(p.streak, 1);
+    });
+  });
+
+  group('꾸미기 상점', () {
+    test('구매: 별 조각 차감 + 보유 + 자동 장착', () {
+      final p = Profile(starPieces: 20);
+      final item = findItem('ribbon_blue')!;
+      expect(buyItem(p, item), isTrue);
+      expect(p.starPieces, 10);
+      expect(p.ownedItems, contains('ribbon_blue'));
+      expect(p.equipped['ribbon'], 'ribbon_blue');
+    });
+
+    test('별 조각 부족 시 구매 실패', () {
+      final p = Profile(starPieces: 5);
+      expect(buyItem(p, findItem('hat_crown')!), isFalse);
+      expect(p.starPieces, 5);
+      expect(p.ownedItems, isEmpty);
+    });
+
+    test('중복 구매 불가', () {
+      final p = Profile(starPieces: 50);
+      final item = findItem('face_star')!;
+      expect(buyItem(p, item), isTrue);
+      expect(buyItem(p, item), isFalse);
+      expect(p.starPieces, 50 - item.price);
+    });
+
+    test('장착 토글: 입기 ↔ 벗기', () {
+      final p = Profile(starPieces: 50);
+      final item = findItem('hat_wizard')!;
+      buyItem(p, item);
+      expect(p.equipped['hat'], 'hat_wizard');
+      toggleEquip(p, item);
+      expect(p.equipped.containsKey('hat'), isFalse);
+      toggleEquip(p, item);
+      expect(p.equipped['hat'], 'hat_wizard');
+    });
+
+    test('Phase 1 프로필 JSON 마이그레이션 — 새 필드 기본값', () {
+      final old = Profile(starPieces: 7).toJson()
+        ..remove('ownedItems')
+        ..remove('equipped')
+        ..remove('starCatchHighScore');
+      final migrated = Profile.fromJson(old);
+      expect(migrated.ownedItems, isEmpty);
+      expect(migrated.equipped, isEmpty);
+      expect(migrated.starCatchHighScore, 0);
+      expect(migrated.starPieces, 7);
+    });
+  });
+
+  group('별 수집 모드', () {
+    test('출제 풀: 한 번이라도 맞힌 카드만', () {
+      final deck = FactCard.buildDeck();
+      expect(StarCatch.pool(deck), isEmpty);
+      expect(StarCatch.unlocked(deck), isFalse);
+
+      for (final c in deck.take(4)) {
+        c.totalCorrect = 1;
+      }
+      expect(StarCatch.pool(deck).length, 4);
+      expect(StarCatch.unlocked(deck), isTrue);
+    });
+
+    test('문제 뽑기: 직전 문제와 중복 회피', () {
+      final deck = FactCard.buildDeck();
+      for (final c in deck.take(5)) {
+        c.totalCorrect = 1;
+      }
+      final pool = StarCatch.pool(deck);
+      final rng = Random(1);
+      var prev = StarCatch.pick(pool, rng);
+      for (var i = 0; i < 50; i++) {
+        final next = StarCatch.pick(pool, rng, previous: prev);
+        expect(next.id, isNot(prev.id));
+        prev = next;
+      }
+    });
+
+    test('낙하 속도는 점수에 따라 증가, 상한 있음', () {
+      expect(StarCatch.fallSpeed(0), lessThan(StarCatch.fallSpeed(10)));
+      expect(StarCatch.fallSpeed(25), StarCatch.fallSpeed(100)); // 25점에서 상한
+    });
+
+    test('보상: 3점당 별 조각 1개 (최대 10) + 신기록 보너스 2', () {
+      expect(StarCatch.reward(0, newRecord: false), 0);
+      expect(StarCatch.reward(9, newRecord: false), 3);
+      expect(StarCatch.reward(9, newRecord: true), 5);
+      expect(StarCatch.reward(99, newRecord: false), 10); // 상한
     });
   });
 

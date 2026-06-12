@@ -9,6 +9,9 @@ class Profile {
   int rouletteTickets;
   List<int> masteredDans;
   List<String> rouletteHistory; // "2026-06-12:won100" 형태
+  List<String> ownedItems; // 꾸미기 아이템 ID
+  Map<String, String> equipped; // 슬롯 → 아이템 ID
+  int starCatchHighScore;
 
   Profile({
     this.level = 1,
@@ -20,8 +23,13 @@ class Profile {
     this.rouletteTickets = 0,
     List<int>? masteredDans,
     List<String>? rouletteHistory,
+    List<String>? ownedItems,
+    Map<String, String>? equipped,
+    this.starCatchHighScore = 0,
   })  : masteredDans = masteredDans ?? [],
-        rouletteHistory = rouletteHistory ?? [];
+        rouletteHistory = rouletteHistory ?? [],
+        ownedItems = ownedItems ?? [],
+        equipped = equipped ?? {};
 
   int get xpForNextLevel => level * 100;
 
@@ -60,6 +68,9 @@ class Profile {
         'rouletteTickets': rouletteTickets,
         'masteredDans': masteredDans,
         'rouletteHistory': rouletteHistory,
+        'ownedItems': ownedItems,
+        'equipped': equipped,
+        'starCatchHighScore': starCatchHighScore,
       };
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
@@ -72,5 +83,9 @@ class Profile {
         rouletteTickets: json['rouletteTickets'] as int,
         masteredDans: (json['masteredDans'] as List).cast<int>(),
         rouletteHistory: (json['rouletteHistory'] as List).cast<String>(),
+        // Phase 1 저장 데이터엔 없는 필드 — 기본값으로 마이그레이션
+        ownedItems: (json['ownedItems'] as List?)?.cast<String>(),
+        equipped: (json['equipped'] as Map?)?.cast<String, String>(),
+        starCatchHighScore: json['starCatchHighScore'] as int? ?? 0,
       );
 }

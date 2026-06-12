@@ -38,9 +38,10 @@ lib/
 │   ├── sm2_scheduler.dart     # 아동용 간격 반복
 │   ├── question_generator.dart# 세션 구성 (새 카드 블로킹 + 복습 인터리빙)
 │   ├── progression.dart       # 숙달/해금 판정
-│   └── roulette.dart          # 확률 보상
-├── screens/                   # 홈(세계 지도), 탐험, 결과, 룰렛
-└── widgets/dajoy_character.dart # 김다조이 캐릭터 (CustomPainter, 표정 4종)
+│   ├── roulette.dart          # 확률 보상
+│   └── star_catch.dart        # 별 수집 모드 규칙
+├── screens/                   # 홈(세계 지도), 탐험, 결과, 룰렛, 상점, 별 수집
+└── widgets/dajoy_character.dart # 김다조이 캐릭터 (CustomPainter, 표정 4종 + 꾸미기)
 ```
 
 ## 개발
@@ -53,6 +54,13 @@ flutter run        # Android 기기/에뮬레이터
 
 ## 로드맵
 
-- **Phase 1 (현재)**: 핵심 학습 루프 + 룰렛 + 저금통 ✅
-- **Phase 2**: 캐릭터 꾸미기 상점, 별 수집 모드(선택형 타임어택), 세계 비주얼
+- **Phase 1**: 핵심 학습 루프 + 룰렛 + 저금통 ✅
+- **Phase 2**: 캐릭터 꾸미기 상점 + 별 수집 모드(선택형 보너스 게임) ✅
 - **Phase 3**: Firebase 기기 간 동기화(가족 코드), 부모 리포트, TTS
+
+### 별 수집 모드 설계 노트
+
+시간제한이 있는 유일한 모드 — 의도적으로 **아이가 스스로 선택하는 보너스
+게임**으로만 제공한다 (기본 학습엔 시간 압박 없음). 배운 카드만 섞여 나와
+인터리빙 복습 효과를 내고, 결과는 SM-2 스케줄에 반영하지 않는다 — 시간 압박
+속 오답이 복습 주기를 망가뜨리면 안 되기 때문.
