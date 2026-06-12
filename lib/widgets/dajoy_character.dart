@@ -247,5 +247,9 @@ class _DajoyPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DajoyPainter oldDelegate) => oldDelegate.expression != expression;
+  bool shouldRepaint(_DajoyPainter oldDelegate) =>
+      oldDelegate.expression != expression ||
+      oldDelegate.style.ribbonColor != style.ribbonColor ||
+      oldDelegate.style.hatId != style.hatId ||
+      oldDelegate.style.faceId != style.faceId;
 }

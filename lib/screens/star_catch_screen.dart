@@ -137,6 +137,7 @@ class _StarCatchScreenState extends State<StarCatchScreen>
     if (_wasNewRecord) profile.starCatchHighScore = _score;
     _lastReward = StarCatch.reward(_score, newRecord: _wasNewRecord);
     profile.starPieces += _lastReward;
+    profile.recordPlayToday(DateTime.now()); // 별 수집도 출석으로 인정
     await repo.saveProfile();
     await repo.logEvent(
         'star_catch', {'score': _score, 'newRecord': _wasNewRecord}, DateTime.now());

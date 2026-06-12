@@ -37,6 +37,9 @@ class FirebaseSyncService implements SyncService {
     if (remoteProfile != null) {
       _mergeProfile(repo, Profile.fromJson(remoteProfile));
       await repo.saveProfile();
+      // pull 후 syncBase 갱신: 재-pull이 중복 적립을 일으키지 않도록
+      // base = remote 기준으로 설정하면 merged = remote + (merged − remote) = merged (멱등)
+      await repo.setMeta('syncBase', jsonEncode(remoteProfile));
     }
     final remoteCards = data['cards'] as Map<String, dynamic>?;
     if (remoteCards != null) {
@@ -106,11 +109,16 @@ class FirebaseSyncService implements SyncService {
     local.xp = 0;
     local.addXp(totalXp);
 
-    // 기록: 더 앞선 값
-    if (r.streak > local.streak) local.streak = r.streak;
+    // 스트릭: 더 최신 lastPlayDate 기준으로 판단 — 끊긴 스트릭이 부활하면 안 됨
+    if (r.lastPlayDate != null) {
+      final localNewer = local.lastPlayDate != null &&
+          local.lastPlayDate!.compareTo(r.lastPlayDate!) >= 0;
+      if (!localNewer) local.streak = r.streak;
+    }
     if (r.starCatchHighScore > local.starCatchHighScore) {
       local.starCatchHighScore = r.starCatchHighScore;
     }
+    // lastPlayDate는 스트릭 직후 별도 갱신 (위에서 이미 처리)
     if (r.lastPlayDate != null &&
         (local.lastPlayDate == null ||
             r.lastPlayDate!.compareTo(local.lastPlayDate!) > 0)) {
@@ -124,8 +132,10 @@ class FirebaseSyncService implements SyncService {
     local.rouletteHistory =
         {...local.rouletteHistory, ...r.rouletteHistory}.toList()..sort();
 
-    // 꾸미기/PIN: 로컬 우선, 비어 있으면 원격 채택
-    if (local.equipped.isEmpty) local.equipped = r.equipped;
+    // 꾸미기: 슬롯 단위 병합 — 로컬에 없는 슬롯만 원격에서 채움
+    for (final entry in r.equipped.entries) {
+      local.equipped.putIfAbsent(entry.key, () => entry.value);
+    }
     local.parentPin ??= r.parentPin;
   }
 

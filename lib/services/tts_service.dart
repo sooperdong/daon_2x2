@@ -10,11 +10,15 @@ class TtsService {
   bool _ready = false;
 
   Future<void> init() async {
-    await _tts.setLanguage('ko-KR');
-    await _tts.setSpeechRate(0.42); // 아이가 따라 읽기 적당한 속도
-    await _tts.setVolume(1.0);
-    await _tts.setPitch(1.1); // 약간 높은 톤 — 친근하게
-    _ready = true;
+    try {
+      await _tts.setLanguage('ko-KR');
+      await _tts.setSpeechRate(0.42); // 아이가 따라 읽기 적당한 속도
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(1.1); // 약간 높은 톤 — 친근하게
+      _ready = true;
+    } catch (_) {
+      // TTS 엔진 없는 기기에서도 앱이 정상 시작되도록 — 암송문은 텍스트로만 표시
+    }
   }
 
   /// 구구단 암송문 읽기: "이 삼은 육"

@@ -6,6 +6,7 @@ import '../core/constants.dart';
 import '../data/game_repository.dart';
 import '../engine/roulette.dart';
 import '../widgets/dajoy_character.dart';
+import 'shop_screen.dart' show styleFromProfile;
 
 /// 마법 룰렛 — 꽝 50% / 100원 40% / 1000원 10%.
 /// 당첨금은 저금통에 쌓이고 부모가 실제 현금으로 전달한다.
@@ -141,6 +142,7 @@ class _RouletteScreenState extends State<RouletteScreen>
                       ? DajoyExpression.jackpot
                       : (_spinning ? DajoyExpression.focus : DajoyExpression.happy),
                   size: 100,
+                  style: styleFromProfile(widget.repo.profile),
                 ),
                 const SizedBox(height: 8),
                 if (_result != null) _buildResult(_result!),

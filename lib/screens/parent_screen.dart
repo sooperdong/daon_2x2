@@ -21,6 +21,9 @@ class _ParentScreenState extends State<ParentScreen> {
   String _pinInput = '';
   String? _error;
 
+  // PIN 신규 설정: 2회 입력 확인 (오타로 영구 잠금 방지)
+  String? _pinFirst; // 첫 번째 입력값 보관
+
   // 가족 코드 입력
   final _codeCtrl = TextEditingController();
   bool _syncBusy = false;
@@ -59,7 +62,11 @@ class _ParentScreenState extends State<ParentScreen> {
             const Text('🔐', style: TextStyle(fontSize: 48)),
             const SizedBox(height: 8),
             Text(
-              hasPin ? '부모님 PIN을 입력해주세요' : 'PIN을 새로 설정해주세요 (4자리 숫자)',
+              hasPin
+                  ? '부모님 PIN을 입력해주세요'
+                  : (_pinFirst == null
+                      ? 'PIN을 새로 설정해주세요 (4자리 숫자)'
+                      : 'PIN을 한 번 더 입력해주세요'),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
@@ -136,7 +143,23 @@ class _ParentScreenState extends State<ParentScreen> {
     }
     final profile = widget.repo.profile;
     if (profile.parentPin == null) {
-      // 신규 PIN 설정
+      // 신규 PIN 설정 — 오타 방지를 위해 2회 입력 확인
+      if (_pinFirst == null) {
+        setState(() {
+          _pinFirst = _pinInput;
+          _pinInput = '';
+          _error = null;
+        });
+        return;
+      }
+      if (_pinFirst != _pinInput) {
+        setState(() {
+          _pinFirst = null;
+          _pinInput = '';
+          _error = 'PIN이 일치하지 않아요. 처음부터 다시 입력해주세요';
+        });
+        return;
+      }
       profile.parentPin = _pinInput;
       await widget.repo.saveProfile();
       setState(() => _unlocked = true);

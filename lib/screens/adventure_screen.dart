@@ -11,6 +11,7 @@ import '../engine/sm2_scheduler.dart';
 import '../services/tts_service.dart';
 import '../widgets/dajoy_character.dart';
 import 'result_screen.dart';
+import 'shop_screen.dart' show styleFromProfile;
 
 /// 탐험 모드 — 핵심 학습 루프.
 ///
@@ -105,6 +106,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
   bool get _useInput => (_current?.consecutiveCorrect ?? 0) >= 2;
 
   Future<void> _answer(int value) async {
+    if (_phase != _Phase.question) return; // 멀티터치 연타 방지
     final card = _current!;
     final correct = value == card.answer;
     final firstAttempt = !_attempted.contains(card.id);
@@ -192,7 +194,8 @@ class _AdventureScreenState extends State<AdventureScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const DajoyCharacter(expression: DajoyExpression.happy, size: 120),
+              DajoyCharacter(expression: DajoyExpression.happy, size: 120,
+                  style: styleFromProfile(widget.repo.profile)),
               const SizedBox(height: 16),
               const Text('오늘은 여기서 복습할 마법이 없어!',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -233,7 +236,8 @@ class _AdventureScreenState extends State<AdventureScreen> {
               },
             ),
             const Spacer(),
-            DajoyCharacter(expression: _expression, size: 96),
+            DajoyCharacter(expression: _expression, size: 96,
+                style: styleFromProfile(widget.repo.profile)),
             const SizedBox(height: 8),
           ],
         ),
@@ -276,7 +280,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
     // 카드가 나타나는 순간 자동 발음 — WidgetsBinding으로 build 완료 후 실행
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_phase == _Phase.chant && _current?.id == card.id) {
-        TtsService.instance.speakChant('${card.a} 곱하기 ${card.b}은 ${card.answer}. $chant');
+        TtsService.instance.speakChant('${card.a} 곱하기 ${card.b}${_eunNeun(card.b)} ${card.answer}. $chant');
       }
     });
 
@@ -305,7 +309,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
                     icon: const Text('🔊', style: TextStyle(fontSize: 22)),
                     tooltip: '다시 듣기',
                     onPressed: () => TtsService.instance.speakChant(
-                        '${card.a} 곱하기 ${card.b}은 ${card.answer}. $chant'),
+                        '${card.a} 곱하기 ${card.b}${_eunNeun(card.b)} ${card.answer}. $chant'),
                   ),
                 ],
               ),
@@ -440,4 +444,10 @@ class _AdventureScreenState extends State<AdventureScreen> {
       ),
     );
   }
+}
+
+/// 숫자 b에 맞는 조사 (은/는/없음) — TTS용
+String _eunNeun(int b) {
+  const map = {1: '은', 2: '는', 3: '은', 6: '은', 7: '은', 8: '은'};
+  return map[b] ?? '';
 }

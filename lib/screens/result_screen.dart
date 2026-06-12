@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../data/game_repository.dart';
 import '../widgets/dajoy_character.dart';
 import 'roulette_screen.dart';
+import 'shop_screen.dart' show styleFromProfile;
 
 /// 세션 완료 화면 — 보상 요약과 룰렛 안내
 class ResultScreen extends StatelessWidget {
@@ -40,7 +41,8 @@ class ResultScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                const DajoyCharacter(expression: DajoyExpression.cheer, size: 140),
+                DajoyCharacter(expression: DajoyExpression.cheer, size: 140,
+                    style: styleFromProfile(repo.profile)),
                 const SizedBox(height: 12),
                 Text('${world.emoji} 스테이지 클리어!',
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
