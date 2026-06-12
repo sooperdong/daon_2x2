@@ -73,4 +73,35 @@ class GameRepository {
   Future<void> logEvent(String type, Map<String, dynamic> data, DateTime at) async {
     await _events.add(jsonEncode({'type': type, ...data, 'at': at.toIso8601String()}));
   }
+
+  // ── 부모 리포트용 통계 집계 ────────────────────────────────────────────
+
+  /// 단별 [총 시도, 총 정답] 집계 (첫 시도만 포함)
+  Map<int, (int, int)> danStats() {
+    final stats = <int, (int, int)>{};
+    for (final card in deck) {
+      final total = card.totalCorrect + card.totalWrong;
+      if (total == 0) continue;
+      final dan = card.homeDan;
+      final prev = stats[dan] ?? (0, 0);
+      stats[dan] = (prev.$1 + total, prev.$2 + card.totalCorrect);
+    }
+    return stats;
+  }
+
+  /// 전체 세션 수 (이벤트 로그 기반)
+  int totalSessions() {
+    var count = 0;
+    for (final raw in _events.values) {
+      final e = jsonDecode(raw) as Map<String, dynamic>;
+      if (e['type'] == 'session') count++;
+    }
+    return count;
+  }
+
+  /// 전체 정답 수 (첫 시도 기준)
+  int totalCorrectAll() => deck.fold(0, (s, c) => s + c.totalCorrect);
+
+  /// 전체 시도 수 (첫 시도 기준)
+  int totalAttemptedAll() => deck.fold(0, (s, c) => s + c.totalCorrect + c.totalWrong);
 }

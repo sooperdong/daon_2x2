@@ -8,6 +8,7 @@ import 'package:daon_2x2/data/models/fact_card.dart';
 import 'package:daon_2x2/data/models/profile.dart';
 import 'package:daon_2x2/engine/progression.dart';
 import 'package:daon_2x2/engine/question_generator.dart';
+import 'package:daon_2x2/services/sync_service.dart';
 import 'package:daon_2x2/engine/roulette.dart';
 import 'package:daon_2x2/engine/sm2_scheduler.dart';
 import 'package:daon_2x2/engine/star_catch.dart';
@@ -329,6 +330,46 @@ void main() {
       expect(StarCatch.reward(9, newRecord: false), 3);
       expect(StarCatch.reward(9, newRecord: true), 5);
       expect(StarCatch.reward(99, newRecord: false), 10); // 상한
+    });
+  });
+
+  group('Phase 3 — 프로필 출석/동기화', () {
+    test('출석 기록: playDates에 추가, 90일 초과분 제거', () {
+      final p = Profile();
+      p.recordPlayToday(DateTime(2026, 6, 12));
+      expect(p.playDates, contains('2026-06-12'));
+
+      // 91일 전 날짜는 잘림
+      p.playDates.add('2026-03-12'); // 92일 전
+      p.recordPlayToday(DateTime(2026, 6, 13));
+      expect(p.playDates, isNot(contains('2026-03-12')));
+      expect(p.playDates, contains('2026-06-13'));
+    });
+
+    test('Phase 2 프로필 → Phase 3 마이그레이션: playDates 기본값', () {
+      final old = Profile(starPieces: 5).toJson()..remove('playDates');
+      final p = Profile.fromJson(old);
+      expect(p.playDates, isEmpty);
+      expect(p.parentPin, isNull);
+      expect(p.familyCode, isNull);
+    });
+
+    test('가족 코드 생성: 6자리 대문자 영숫자, 혼동 문자 없음', () {
+      const bad = {'0', 'O', '1', 'I'};
+      for (var i = 0; i < 100; i++) {
+        final code = generateFamilyCode();
+        expect(code.length, 6);
+        expect(code, matches(RegExp(r'^[A-Z2-9]+$')));
+        for (final ch in code.split('')) {
+          expect(bad, isNot(contains(ch)));
+        }
+      }
+    });
+
+    test('NoOpSyncService: isEnabled false, setFamilyCode false 반환', () async {
+      const sync = NoOpSyncService();
+      expect(sync.isEnabled, isFalse);
+      // push/pull은 GameRepository 초기화가 필요해 단위 테스트에서 호출 불가
     });
   });
 

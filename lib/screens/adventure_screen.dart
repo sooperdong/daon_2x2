@@ -8,6 +8,7 @@ import '../data/game_repository.dart';
 import '../engine/progression.dart';
 import '../engine/question_generator.dart';
 import '../engine/sm2_scheduler.dart';
+import '../services/tts_service.dart';
 import '../widgets/dajoy_character.dart';
 import 'result_screen.dart';
 
@@ -93,6 +94,7 @@ class _AdventureScreenState extends State<AdventureScreen> {
   }
 
   void _startQuestion() {
+    TtsService.instance.stop();
     setState(() {
       _phase = _Phase.question;
       _choices = QuestionGenerator.choices(_current!, random: _rng);
@@ -268,8 +270,16 @@ class _AdventureScreenState extends State<AdventureScreen> {
     );
   }
 
-  /// 암송 카드 — 부호화 단계 (한국식 구구단 읽기)
+  /// 암송 카드 — 부호화 단계 (한국식 구구단 읽기 + TTS 자동 발음)
   Widget _buildChantCard(FactCard card) {
+    final chant = chantText(card.a, card.b);
+    // 카드가 나타나는 순간 자동 발음 — WidgetsBinding으로 build 완료 후 실행
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_phase == _Phase.chant && _current?.id == card.id) {
+        TtsService.instance.speakChant('${card.a} 곱하기 ${card.b}은 ${card.answer}. $chant');
+      }
+    });
+
     return Center(
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 32),
@@ -284,8 +294,21 @@ class _AdventureScreenState extends State<AdventureScreen> {
               Text('${card.a} × ${card.b} = ${card.answer}',
                   style: const TextStyle(fontSize: 44, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('"${chantText(card.a, card.b)}"',
-                  style: const TextStyle(fontSize: 24, color: Color(0xFF7B5EA7))),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('"$chant"',
+                      style: const TextStyle(fontSize: 24, color: Color(0xFF7B5EA7))),
+                  const SizedBox(width: 8),
+                  // 다시 듣기 버튼
+                  IconButton(
+                    icon: const Text('🔊', style: TextStyle(fontSize: 22)),
+                    tooltip: '다시 듣기',
+                    onPressed: () => TtsService.instance.speakChant(
+                        '${card.a} 곱하기 ${card.b}은 ${card.answer}. $chant'),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               Text('${card.b} × ${card.a}도 똑같이 ${card.answer}! 뒤집어도 같아 🔄',
                   style: const TextStyle(fontSize: 14, color: Colors.black54)),

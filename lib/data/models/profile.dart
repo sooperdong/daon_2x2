@@ -2,16 +2,21 @@
 class Profile {
   int level;
   int xp;
-  int starPieces; // 별 조각 (Phase 2 꾸미기 화폐)
-  int piggyBank; // 저금통 누적 원화
-  int streak; // 연속 학습 일수
+  int starPieces;
+  int piggyBank;
+  int streak;
   String? lastPlayDate; // yyyy-MM-dd
   int rouletteTickets;
   List<int> masteredDans;
-  List<String> rouletteHistory; // "2026-06-12:won100" 형태
-  List<String> ownedItems; // 꾸미기 아이템 ID
+  List<String> rouletteHistory; // "2026-06-12:won100"
+  List<String> ownedItems;
   Map<String, String> equipped; // 슬롯 → 아이템 ID
   int starCatchHighScore;
+
+  // Phase 3
+  String? parentPin;   // 4자리 숫자 — 부모 리포트 잠금
+  String? familyCode;  // Firebase 가족 동기화 코드
+  List<String> playDates; // 출석한 날 yyyy-MM-dd (최근 90일)
 
   Profile({
     this.level = 1,
@@ -26,14 +31,17 @@ class Profile {
     List<String>? ownedItems,
     Map<String, String>? equipped,
     this.starCatchHighScore = 0,
+    this.parentPin,
+    this.familyCode,
+    List<String>? playDates,
   })  : masteredDans = masteredDans ?? [],
         rouletteHistory = rouletteHistory ?? [],
         ownedItems = ownedItems ?? [],
-        equipped = equipped ?? {};
+        equipped = equipped ?? {},
+        playDates = playDates ?? [];
 
   int get xpForNextLevel => level * 100;
 
-  /// XP 추가 후 레벨업 횟수 반환
   int addXp(int amount) {
     xp += amount;
     var levelUps = 0;
@@ -45,13 +53,20 @@ class Profile {
     return levelUps;
   }
 
-  /// 오늘 플레이 기록 → 스트릭 갱신. 7일 달성 시 true (룰렛 티켓 지급 신호)
+  /// 오늘 플레이 기록 → 스트릭 + 출석 갱신. 7일 달성 시 true.
   bool recordPlayToday(DateTime now) {
     final today = _dateKey(now);
     if (lastPlayDate == today) return false;
     final yesterday = _dateKey(now.subtract(const Duration(days: 1)));
     streak = (lastPlayDate == yesterday) ? streak + 1 : 1;
     lastPlayDate = today;
+
+    // 출석 기록 (최근 90일만 보관)
+    if (!playDates.contains(today)) {
+      playDates.add(today);
+      final cutoff = _dateKey(now.subtract(const Duration(days: 90)));
+      playDates.removeWhere((d) => d.compareTo(cutoff) < 0);
+    }
     return streak > 0 && streak % 7 == 0;
   }
 
@@ -71,6 +86,9 @@ class Profile {
         'ownedItems': ownedItems,
         'equipped': equipped,
         'starCatchHighScore': starCatchHighScore,
+        'parentPin': parentPin,
+        'familyCode': familyCode,
+        'playDates': playDates,
       };
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
@@ -83,9 +101,11 @@ class Profile {
         rouletteTickets: json['rouletteTickets'] as int,
         masteredDans: (json['masteredDans'] as List).cast<int>(),
         rouletteHistory: (json['rouletteHistory'] as List).cast<String>(),
-        // Phase 1 저장 데이터엔 없는 필드 — 기본값으로 마이그레이션
         ownedItems: (json['ownedItems'] as List?)?.cast<String>(),
         equipped: (json['equipped'] as Map?)?.cast<String, String>(),
         starCatchHighScore: json['starCatchHighScore'] as int? ?? 0,
+        parentPin: json['parentPin'] as String?,
+        familyCode: json['familyCode'] as String?,
+        playDates: (json['playDates'] as List?)?.cast<String>() ?? [],
       );
 }

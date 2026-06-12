@@ -2,18 +2,30 @@ import 'package:flutter/material.dart';
 
 import 'data/game_repository.dart';
 import 'screens/home_screen.dart';
+import 'services/sync_service.dart';
+import 'services/tts_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase 활성화 시:
+  //   await Firebase.initializeApp();
+  //   final sync = FirebaseSyncService();
+  const SyncService sync = NoOpSyncService();
+
+  await TtsService.instance.init();
+
   final repo = GameRepository();
   await repo.init();
-  runApp(DaonApp(repo: repo));
+
+  runApp(DaonApp(repo: repo, sync: sync));
 }
 
 class DaonApp extends StatelessWidget {
   final GameRepository repo;
+  final SyncService sync;
 
-  const DaonApp({super.key, required this.repo});
+  const DaonApp({super.key, required this.repo, required this.sync});
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +40,7 @@ class DaonApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFFFFF8F0),
       ),
-      home: HomeScreen(repo: repo),
+      home: HomeScreen(repo: repo, sync: sync),
     );
   }
 }

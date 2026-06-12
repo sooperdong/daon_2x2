@@ -4,8 +4,10 @@ import '../core/constants.dart';
 import '../data/game_repository.dart';
 import '../engine/progression.dart';
 import '../engine/star_catch.dart';
+import '../services/sync_service.dart';
 import '../widgets/dajoy_character.dart';
 import 'adventure_screen.dart';
+import 'parent_screen.dart';
 import 'roulette_screen.dart';
 import 'shop_screen.dart';
 import 'star_catch_screen.dart';
@@ -14,8 +16,9 @@ import 'star_catch_screen.dart';
 /// SDT 자율성 원칙: 어떤 세계에 갈지 아이가 직접 선택한다.
 class HomeScreen extends StatefulWidget {
   final GameRepository repo;
+  final SyncService sync;
 
-  const HomeScreen({super.key, required this.repo});
+  const HomeScreen({super.key, required this.repo, required this.sync});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -23,6 +26,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   GameRepository get repo => widget.repo;
+  SyncService get sync => widget.sync;
+
+  // 레벨 뱃지 3번 탭 → 부모 화면 진입
+  int _levelTapCount = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +86,11 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const Text('김다조이',
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                Text('레벨 $level 수학 마법사', style: const TextStyle(fontSize: 14)),
+                GestureDetector(
+                  onTap: _onLevelTap,
+                  child: Text('레벨 $level 수학 마법사',
+                      style: const TextStyle(fontSize: 14)),
+                ),
                 const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -152,6 +163,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _push(Widget screen) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
     setState(() {});
+  }
+
+  void _onLevelTap() {
+    _levelTapCount++;
+    if (_levelTapCount >= 3) {
+      _levelTapCount = 0;
+      _push(ParentScreen(repo: repo, sync: sync));
+    }
   }
 
   Future<void> _enterWorld(int dan) async {
