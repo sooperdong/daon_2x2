@@ -15,6 +15,7 @@ dependencies:
   hive_flutter: ^1.1.0
   path_provider: ^2.1.4
   flutter_tts: ^4.2.0
+  image_picker: ^1.1.2
 
   # ── Firebase (Phase 3 기기 동기화) ──────────────────────────────────────
   # Firebase 프로젝트: daon-2x2 / android/app/google-services.json 필요

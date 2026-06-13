@@ -1,25 +1,36 @@
+import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-enum DajoyExpression { happy, focus, cheer, jackpot }
+enum DajoyExpression {
+  happy,   // 웃는 눈
+  focus,   // 또렷한 눈 (집중)
+  cheer,   // 윙크 (정답)
+  jackpot, // 별 눈 (완벽)
+  silly,   // X 눈 (오답 개그)
+}
 
-/// 꾸미기 장착 상태 — 상점 아이템이 캐릭터 외형을 바꾼다
+/// 꾸미기 장착 상태 — 상점 아이템이 캐릭터 외형을 바꾼다.
 class DajoyStyle {
   final Color ribbonColor;
-  final String? hatId; // hat_wizard / hat_crown / hat_flower
-  final String? faceId; // face_glasses / face_star
+  final String? hatId;    // hat_wizard / hat_crown / hat_flower
+  final String? faceId;   // face_glasses / face_star
+  final String? photoPath; // 기기 로컬 사진 경로 (절대 동기화 안 됨)
 
   const DajoyStyle({
     this.ribbonColor = const Color(0xFFFF8FAB),
     this.hatId,
     this.faceId,
+    this.photoPath,
   });
 }
 
-/// 김다조이 — 양 갈래 머리 치비 캐릭터.
-/// 사진 업로드 없이 코드로 그려서 개인정보가 기기 밖으로 나가지 않는다.
-class DajoyCharacter extends StatelessWidget {
+/// 김다조이 캐릭터.
+/// photoPath가 있으면 실제 아이 얼굴 사진이 원형으로 표시되고
+/// 머리/핀/모자는 그 위에 그려진다.
+class DajoyCharacter extends StatefulWidget {
   final DajoyExpression expression;
   final double size;
   final DajoyStyle style;
@@ -32,10 +43,47 @@ class DajoyCharacter extends StatelessWidget {
   });
 
   @override
+  State<DajoyCharacter> createState() => _DajoyCharacterState();
+}
+
+class _DajoyCharacterState extends State<DajoyCharacter> {
+  ui.Image? _faceImage;
+  String? _loadedPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPhoto();
+  }
+
+  @override
+  void didUpdateWidget(DajoyCharacter old) {
+    super.didUpdateWidget(old);
+    if (old.style.photoPath != widget.style.photoPath) _loadPhoto();
+  }
+
+  Future<void> _loadPhoto() async {
+    final path = widget.style.photoPath;
+    if (path == null || path.isEmpty) {
+      if (mounted) setState(() { _faceImage = null; _loadedPath = null; });
+      return;
+    }
+    if (path == _loadedPath) return;
+    try {
+      final bytes = await File(path).readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 256, targetHeight: 256);
+      final frame = await codec.getNextFrame();
+      if (mounted) setState(() { _faceImage = frame.image; _loadedPath = path; });
+    } catch (_) {
+      if (mounted) setState(() { _faceImage = null; _loadedPath = null; });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      size: Size(size, size),
-      painter: _DajoyPainter(expression, style),
+      size: Size(widget.size, widget.size),
+      painter: _DajoyPainter(widget.expression, widget.style, _faceImage),
     );
   }
 }
@@ -43,8 +91,9 @@ class DajoyCharacter extends StatelessWidget {
 class _DajoyPainter extends CustomPainter {
   final DajoyExpression expression;
   final DajoyStyle style;
+  final ui.Image? facePhoto;
 
-  _DajoyPainter(this.expression, this.style);
+  _DajoyPainter(this.expression, this.style, this.facePhoto);
 
   static const _skin = Color(0xFFFFE0BD);
   static const _hair = Color(0xFF3B2B20);
@@ -65,7 +114,7 @@ class _DajoyPainter extends CustomPainter {
     canvas.drawCircle(Offset(cx - faceR * 1.25, faceCy + faceR * 0.3), faceR * 0.55, hairPaint);
     canvas.drawCircle(Offset(cx + faceR * 1.25, faceCy + faceR * 0.3), faceR * 0.55, hairPaint);
 
-    // 머리핀 리본 (상점에서 색상 교체 가능)
+    // 머리핀 리본
     final ribbonPaint = Paint()..color = style.ribbonColor;
     canvas.drawCircle(Offset(cx - faceR * 1.18, faceCy - faceR * 0.12), faceR * 0.16, ribbonPaint);
     canvas.drawCircle(Offset(cx + faceR * 1.18, faceCy - faceR * 0.12), faceR * 0.16, ribbonPaint);
@@ -73,8 +122,19 @@ class _DajoyPainter extends CustomPainter {
     // 뒷머리
     canvas.drawCircle(Offset(cx, faceCy - faceR * 0.15), faceR * 1.1, hairPaint);
 
-    // 얼굴
-    canvas.drawCircle(Offset(cx, faceCy), faceR, skinPaint);
+    // 얼굴 — 사진 또는 피부색
+    if (facePhoto != null) {
+      canvas.save();
+      canvas.clipPath(Path()..addOval(
+          Rect.fromCircle(center: Offset(cx, faceCy), radius: faceR)));
+      final src = Rect.fromLTWH(
+          0, 0, facePhoto!.width.toDouble(), facePhoto!.height.toDouble());
+      final dst = Rect.fromCircle(center: Offset(cx, faceCy), radius: faceR);
+      canvas.drawImageRect(facePhoto!, src, dst, Paint());
+      canvas.restore();
+    } else {
+      canvas.drawCircle(Offset(cx, faceCy), faceR, skinPaint);
+    }
 
     // 앞머리 (둥근 뱅)
     final bangs = Path()
@@ -87,7 +147,7 @@ class _DajoyPainter extends CustomPainter {
       ..close();
     canvas.drawPath(bangs, hairPaint);
 
-    // 볼터치
+    // 볼터치 (사진 위에도 살짝 그려줌)
     final blushPaint = Paint()..color = _blush;
     canvas.drawCircle(Offset(cx - faceR * 0.55, faceCy + faceR * 0.3), faceR * 0.16, blushPaint);
     canvas.drawCircle(Offset(cx + faceR * 0.55, faceCy + faceR * 0.3), faceR * 0.16, blushPaint);
@@ -101,7 +161,6 @@ class _DajoyPainter extends CustomPainter {
   void _drawHat(Canvas canvas, double cx, double cy, double r) {
     switch (style.hatId) {
       case 'hat_wizard':
-        // 보라 고깔 + 챙
         final hat = Paint()..color = const Color(0xFF7B5EA7);
         final cone = Path()
           ..moveTo(cx - r * 0.55, cy - r * 0.95)
@@ -172,34 +231,51 @@ class _DajoyPainter extends CustomPainter {
 
     switch (expression) {
       case DajoyExpression.happy:
-        // 웃는 눈 (위로 굽은 곡선)
         for (final side in [-1, 1]) {
           final p = Path()
             ..moveTo(cx + side * dx - r * 0.14, eyeY + r * 0.05)
-            ..quadraticBezierTo(cx + side * dx, eyeY - r * 0.14, cx + side * dx + r * 0.14, eyeY + r * 0.05);
+            ..quadraticBezierTo(cx + side * dx, eyeY - r * 0.14,
+                cx + side * dx + r * 0.14, eyeY + r * 0.05);
           canvas.drawPath(p, stroke);
         }
       case DajoyExpression.focus:
-        // 동그란 또렷한 눈
         for (final side in [-1, 1]) {
           canvas.drawCircle(Offset(cx + side * dx, eyeY), r * 0.11, dark);
-          canvas.drawCircle(Offset(cx + side * dx - r * 0.03, eyeY - r * 0.04), r * 0.035,
-              Paint()..color = Colors.white);
+          canvas.drawCircle(Offset(cx + side * dx - r * 0.03, eyeY - r * 0.04),
+              r * 0.035, Paint()..color = Colors.white);
         }
       case DajoyExpression.cheer:
-        // 한쪽 윙크
         canvas.drawCircle(Offset(cx - dx, eyeY), r * 0.11, dark);
         canvas.drawCircle(
-            Offset(cx - dx - r * 0.03, eyeY - r * 0.04), r * 0.035, Paint()..color = Colors.white);
+            Offset(cx - dx - r * 0.03, eyeY - r * 0.04),
+            r * 0.035,
+            Paint()..color = Colors.white);
         final wink = Path()
           ..moveTo(cx + dx - r * 0.14, eyeY)
           ..quadraticBezierTo(cx + dx, eyeY + r * 0.1, cx + dx + r * 0.14, eyeY);
         canvas.drawPath(wink, stroke);
       case DajoyExpression.jackpot:
-        // 별 모양 반짝이 눈
         for (final side in [-1, 1]) {
           _drawStar(canvas, Offset(cx + side * dx, eyeY), r * 0.16,
               Paint()..color = const Color(0xFFFFB300));
+        }
+      case DajoyExpression.silly:
+        // X 눈 — 만화 기절/미끄러짐 표현
+        final xPaint = Paint()
+          ..color = const Color(0xFF2D2016)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.09
+          ..strokeCap = StrokeCap.round;
+        for (final side in [-1, 1]) {
+          final center = Offset(cx + side * dx, eyeY);
+          canvas.drawLine(
+              center + Offset(-r * 0.12, -r * 0.12),
+              center + Offset(r * 0.12, r * 0.12),
+              xPaint);
+          canvas.drawLine(
+              center + Offset(-r * 0.12, r * 0.12),
+              center + Offset(r * 0.12, -r * 0.12),
+              xPaint);
         }
     }
   }
@@ -224,11 +300,20 @@ class _DajoyPainter extends CustomPainter {
           ..lineTo(cx + r * 0.1, mouthY);
         canvas.drawPath(p, stroke);
       case DajoyExpression.jackpot:
-        // 크게 벌린 입
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx, mouthY), width: r * 0.4, height: r * 0.32),
+          Rect.fromCenter(
+              center: Offset(cx, mouthY), width: r * 0.4, height: r * 0.32),
           Paint()..color = const Color(0xFFB5552D),
         );
+      case DajoyExpression.silly:
+        // 삐뚤어진 물결 입
+        final p = Path()
+          ..moveTo(cx - r * 0.22, mouthY + r * 0.02)
+          ..quadraticBezierTo(
+              cx - r * 0.08, mouthY - r * 0.1, cx, mouthY + r * 0.05)
+          ..quadraticBezierTo(
+              cx + r * 0.08, mouthY + r * 0.18, cx + r * 0.22, mouthY + r * 0.06);
+        canvas.drawPath(p, stroke);
     }
   }
 
@@ -251,5 +336,7 @@ class _DajoyPainter extends CustomPainter {
       oldDelegate.expression != expression ||
       oldDelegate.style.ribbonColor != style.ribbonColor ||
       oldDelegate.style.hatId != style.hatId ||
-      oldDelegate.style.faceId != style.faceId;
+      oldDelegate.style.faceId != style.faceId ||
+      oldDelegate.style.photoPath != style.photoPath ||
+      oldDelegate.facePhoto != facePhoto;
 }

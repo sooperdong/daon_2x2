@@ -18,6 +18,9 @@ class Profile {
   String? familyCode;  // Firebase 가족 동기화 코드
   List<String> playDates; // 출석한 날 yyyy-MM-dd (최근 90일)
 
+  // 기기 전용 — 절대 Firebase 동기화 안 됨. toJson에 포함되지 않는다.
+  String? photoPath;
+
   Profile({
     this.level = 1,
     this.xp = 0,

@@ -38,6 +38,7 @@ class GameRepository {
 
     final p = _profile.get('me');
     profile = p == null ? Profile() : Profile.fromJson(jsonDecode(p) as Map<String, dynamic>);
+    profile.photoPath = _profile.get('photoPath'); // 기기 전용 — 직렬화 밖에서 보관
   }
 
   Future<void> saveCard(FactCard card) async {
@@ -125,4 +126,10 @@ class GameRepository {
 
   /// 전체 시도 수 (첫 시도 기준)
   int totalAttemptedAll() => deck.fold(0, (s, c) => s + c.totalCorrect + c.totalWrong);
+
+  // ── 얼굴 사진 (기기 전용) ──────────────────────────────────────────────────
+  Future<void> setPhotoPath(String path) async {
+    await _profile.put('photoPath', path);
+    profile.photoPath = path;
+  }
 }

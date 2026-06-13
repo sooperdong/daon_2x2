@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../core/shop_items.dart';
 import '../data/game_repository.dart';
@@ -6,8 +9,6 @@ import '../data/models/profile.dart';
 import '../widgets/dajoy_character.dart';
 
 /// 꾸미기 상점 — 별 조각으로 김다조이를 꾸민다.
-/// 별 조각은 학습 세션에서만 나오므로 "꾸미고 싶으면 공부한다"는
-/// 선순환이 만들어진다. 내 캐릭터에 대한 애착이 매일 접속할 이유가 된다.
 class ShopScreen extends StatefulWidget {
   final GameRepository repo;
 
@@ -31,7 +32,6 @@ class _ShopScreenState extends State<ShopScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 미리보기 — 장착 즉시 반영
             DajoyCharacter(expression: DajoyExpression.happy, size: 130, style: _currentStyle),
             Text('⭐ 별 조각 ${profile.starPieces}개',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -40,6 +40,9 @@ class _ShopScreenState extends State<ShopScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  // 📷 얼굴 사진 선택
+                  _buildPhotoSection(profile),
+                  const SizedBox(height: 20),
                   for (final slot in ItemSlot.values) ...[
                     Text(slot.label,
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -61,6 +64,88 @@ class _ShopScreenState extends State<ShopScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildPhotoSection(Profile profile) {
+    final hasPhoto = profile.photoPath != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('📷 김다조이 얼굴 사진',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        const Text('갤러리에서 사진을 고르면 그림 대신 실제 얼굴이 나와요!',
+            style: TextStyle(fontSize: 12, color: Colors.black54)),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickPhoto,
+          child: Container(
+            height: 72,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: hasPhoto ? const Color(0xFFE8F5E9) : const Color(0xFFF3E5F5),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: hasPhoto ? const Color(0xFF66BB6A) : const Color(0xFF7B5EA7),
+                width: 2,
+              ),
+            ),
+            child: Row(
+              children: [
+                if (hasPhoto)
+                  ClipOval(
+                    child: Image.file(
+                      File(profile.photoPath!),
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image, size: 40),
+                    ),
+                  )
+                else
+                  const Icon(Icons.add_a_photo, size: 40, color: Color(0xFF7B5EA7)),
+                const SizedBox(width: 16),
+                Text(
+                  hasPhoto ? '사진 바꾸기' : '사진 고르기',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: hasPhoto ? const Color(0xFF2E7D32) : const Color(0xFF7B5EA7),
+                  ),
+                ),
+                const Spacer(),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+          ),
+        ),
+        if (hasPhoto)
+          TextButton(
+            onPressed: _removePhoto,
+            child: const Text('사진 삭제', style: TextStyle(color: Colors.red)),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+    if (image == null || !mounted) return;
+    await repo.setPhotoPath(image.path);
+    setState(() {});
+  }
+
+  Future<void> _removePhoto() async {
+    await repo.setPhotoPath('');
+    if (!mounted) return;
+    setState(() {});
   }
 
   Widget _buildItemCard(ShopItem item) {
@@ -130,5 +215,6 @@ DajoyStyle styleFromProfile(Profile profile) {
     ribbonColor: ribbon?.color ?? const Color(0xFFFF8FAB),
     hatId: profile.equipped[ItemSlot.hat.name],
     faceId: profile.equipped[ItemSlot.face.name],
+    photoPath: (profile.photoPath?.isNotEmpty == true) ? profile.photoPath : null,
   );
 }
