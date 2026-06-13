@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../core/constants.dart';
 import '../data/game_repository.dart';
 import '../engine/progression.dart';
-import '../engine/star_catch.dart';
 import '../services/sync_service.dart';
 import '../widgets/dajoy_character.dart';
-import 'adventure_screen.dart';
 import 'parent_screen.dart';
 import 'roulette_screen.dart';
+import 'runner_screen.dart';
 import 'shop_screen.dart';
-import 'star_catch_screen.dart';
 
-/// 메인 화면 — 김다조이 + 세계 지도.
-/// SDT 자율성 원칙: 어떤 세계에 갈지 아이가 직접 선택한다.
+/// 메인 화면 — 김다조이 + 달리기 시작.
+/// 단순함이 핵심: 큰 버튼 하나로 바로 게임에 들어간다.
 class HomeScreen extends StatefulWidget {
   final GameRepository repo;
   final SyncService sync;
@@ -26,44 +23,71 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   GameRepository get repo => widget.repo;
-  SyncService get sync => widget.sync;
 
   // 레벨 뱃지 3번 탭 → 부모 화면 진입
   int _levelTapCount = 0;
 
   @override
   Widget build(BuildContext context) {
-    final unlocked = Progression.unlockedDans(repo.deck);
     final profile = repo.profile;
+    final unlocked = Progression.unlockedDans(repo.deck);
+    final learning = unlocked.join(', ');
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(profile.level, profile.xp, profile.xpForNextLevel),
-            _buildStats(),
-            const SizedBox(height: 8),
-            _buildModeButtons(),
-            const SizedBox(height: 4),
-            Expanded(
-              child: GridView.count(
-                padding: const EdgeInsets.all(16),
-                crossAxisCount: MediaQuery.of(context).size.width > 600 ? 4 : 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                children: [
-                  for (final dan in danUnlockOrder)
-                    _WorldCard(
-                      info: worlds[dan]!,
-                      unlocked: unlocked.contains(dan),
-                      mastered: Progression.isMastered(dan, repo.deck),
-                      progress: Progression.progress(dan, repo.deck),
-                      onTap: () => _enterWorld(dan),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF1F6), Color(0xFFFFE3EC)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(profile.level, profile.xp, profile.xpForNextLevel),
+              const SizedBox(height: 8),
+              _buildStats(),
+              const Spacer(),
+              // 탭하면 꾸미기 — 캐릭터에 대한 애착
+              GestureDetector(
+                onTap: _openShop,
+                child: Column(
+                  children: [
+                    DajoyCharacter(
+                      expression: DajoyExpression.happy,
+                      size: 180,
+                      style: styleFromProfile(profile),
                     ),
-                ],
+                    const Text('툭 누르면 꾸미기 ✨',
+                        style: TextStyle(fontSize: 13, color: Colors.black45)),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Text('지금 배우는 단: $learning단',
+                  style: const TextStyle(fontSize: 14, color: Colors.black54)),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _startRun,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF7B5EA7),
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24)),
+                    ),
+                    child: const Text('🏃 달리기 시작!',
+                        style: TextStyle(
+                            fontSize: 26, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -71,27 +95,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHeader(int level, int xp, int xpNext) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Row(
         children: [
-          DajoyCharacter(
-            expression: DajoyExpression.happy,
-            size: 88,
-            style: styleFromProfile(repo.profile),
-          ),
+          const Text('김다조이',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('김다조이',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 GestureDetector(
                   onTap: _onLevelTap,
                   child: Text('레벨 $level 수학 마법사',
                       style: const TextStyle(fontSize: 14)),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
@@ -113,18 +132,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildStats() {
     final p = repo.profile;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _StatChip(emoji: '⭐', label: '${p.starPieces}개'),
           _StatChip(emoji: '🐷', label: '${p.piggyBank}원'),
-          _StatChip(emoji: '🔥', label: '${p.streak}일 연속'),
+          _StatChip(emoji: '🔥', label: '${p.streak}일'),
           GestureDetector(
             onTap: p.rouletteTickets > 0 ? _openRoulette : null,
             child: _StatChip(
               emoji: '🎡',
-              label: '티켓 ${p.rouletteTickets}장',
+              label: '티켓 ${p.rouletteTickets}',
               highlight: p.rouletteTickets > 0,
             ),
           ),
@@ -133,49 +152,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildModeButtons() {
-    final starCatchOpen = StarCatch.unlocked(repo.deck);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: FilledButton.tonal(
-              onPressed: () => _push(ShopScreen(repo: repo)),
-              child: const Text('🛍️ 꾸미기 상점', style: TextStyle(fontSize: 15)),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: FilledButton.tonal(
-              onPressed: starCatchOpen ? () => _push(StarCatchScreen(repo: repo)) : null,
-              child: Text(
-                starCatchOpen ? '🌠 별 수집' : '🌠 별 수집 (마법 4개 배우면 열려!)',
-                style: const TextStyle(fontSize: 15),
-              ),
-            ),
-          ),
-        ],
-      ),
+  Future<void> _startRun() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => RunnerScreen(repo: repo)),
     );
-  }
-
-  Future<void> _push(Widget screen) async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
     setState(() {});
   }
 
-  void _onLevelTap() {
-    _levelTapCount++;
-    if (_levelTapCount >= 3) {
-      _levelTapCount = 0;
-      _push(ParentScreen(repo: repo, sync: sync));
-    }
-  }
-
-  Future<void> _enterWorld(int dan) async {
+  Future<void> _openShop() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => AdventureScreen(repo: repo, dan: dan)),
+      MaterialPageRoute(builder: (_) => ShopScreen(repo: repo)),
     );
     setState(() {});
   }
@@ -186,6 +172,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     setState(() {});
   }
+
+  void _onLevelTap() {
+    _levelTapCount++;
+    if (_levelTapCount >= 3) {
+      _levelTapCount = 0;
+      Navigator.of(context)
+          .push(MaterialPageRoute(
+              builder: (_) => ParentScreen(repo: repo, sync: widget.sync)))
+          .then((_) => setState(() {}));
+    }
+  }
 }
 
 class _StatChip extends StatelessWidget {
@@ -193,7 +190,8 @@ class _StatChip extends StatelessWidget {
   final String label;
   final bool highlight;
 
-  const _StatChip({required this.emoji, required this.label, this.highlight = false});
+  const _StatChip(
+      {required this.emoji, required this.label, this.highlight = false});
 
   @override
   Widget build(BuildContext context) {
@@ -205,69 +203,6 @@ class _StatChip extends StatelessWidget {
         boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
       child: Text('$emoji $label', style: const TextStyle(fontSize: 14)),
-    );
-  }
-}
-
-class _WorldCard extends StatelessWidget {
-  final WorldInfo info;
-  final bool unlocked;
-  final bool mastered;
-  final double progress;
-  final VoidCallback onTap;
-
-  const _WorldCard({
-    required this.info,
-    required this.unlocked,
-    required this.mastered,
-    required this.progress,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: unlocked ? onTap : null,
-      child: Container(
-        decoration: BoxDecoration(
-          color: unlocked ? info.color.withValues(alpha: 0.25) : Colors.black12,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: mastered ? const Color(0xFFFFB300) : Colors.transparent,
-            width: 3,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(unlocked ? info.emoji : '🔒', style: const TextStyle(fontSize: 40)),
-            const SizedBox(height: 6),
-            Text('${info.dan}단 · ${info.name}',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: unlocked ? Colors.black87 : Colors.black38,
-                )),
-            if (mastered)
-              const Text('👑 마스터!', style: TextStyle(fontSize: 12, color: Color(0xFFE65100))),
-            if (unlocked && !mastered) ...[
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 8,
-                    backgroundColor: Colors.white,
-                    color: info.color,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

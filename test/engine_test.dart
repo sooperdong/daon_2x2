@@ -12,6 +12,7 @@ import 'package:daon_2x2/services/sync_service.dart';
 import 'package:daon_2x2/engine/roulette.dart';
 import 'package:daon_2x2/engine/sm2_scheduler.dart';
 import 'package:daon_2x2/engine/star_catch.dart';
+import 'package:daon_2x2/engine/runner_engine.dart';
 
 void main() {
   group('FactCard 덱', () {
@@ -370,6 +371,77 @@ void main() {
       const sync = NoOpSyncService();
       expect(sync.isEnabled, isFalse);
       // push/pull은 GameRepository 초기화가 필요해 단위 테스트에서 호출 불가
+    });
+  });
+
+  group('러너 엔진', () {
+    test('게이트 문: 정답 포함 3개, 중복 없음, 1~99, correctIndex 정확', () {
+      final deck = FactCard.buildDeck();
+      final rng = Random(7);
+      for (var i = 0; i < 200; i++) {
+        final gate = RunnerEngine.nextGate(deck, DateTime(2026, 6, 13), random: rng);
+        expect(gate.doors.length, 3);
+        expect(gate.doors.toSet().length, 3, reason: '문 값 중복 없음');
+        expect(gate.doors.contains(gate.answer), isTrue);
+        expect(gate.doors[gate.correctIndex], gate.answer);
+        for (final v in gate.doors) {
+          expect(v > 0 && v <= 99, isTrue);
+        }
+      }
+    });
+
+    test('해금된 단의 카드만 게이트로 등장', () {
+      // 새 덱: 2단만 해금 상태 (아무것도 클리어 안 함)
+      final deck = FactCard.buildDeck();
+      final rng = Random(1);
+      final unlocked = Progression.unlockedDans(deck).toSet();
+      expect(unlocked, {2});
+      for (var i = 0; i < 100; i++) {
+        final gate = RunnerEngine.nextGate(deck, DateTime(2026, 6, 13), random: rng);
+        expect(unlocked.contains(gate.card.homeDan), isTrue);
+      }
+    });
+
+    test('직전 게이트와 같은 카드는 피한다', () {
+      // 2단 해금 + 5단 클리어 유도로 카드 풀을 넓힌다
+      final deck = FactCard.buildDeck();
+      // 2단 홈 카드 전부 1회 정답 → 5단 해금
+      for (final c in Progression.homeCards(2, deck)) {
+        c.totalCorrect = 1;
+        c.consecutiveCorrect = 1;
+      }
+      final rng = Random(3);
+      var prev = RunnerEngine.nextGate(deck, DateTime(2026, 6, 13), random: rng);
+      for (var i = 0; i < 100; i++) {
+        final next = RunnerEngine.nextGate(deck, DateTime(2026, 6, 13),
+            random: rng, avoidId: prev.card.id);
+        expect(next.card.id == prev.card.id, isFalse);
+        prev = next;
+      }
+    });
+
+    test('틀린 만기 카드가 익힌 카드보다 자주 나온다 (가중치)', () {
+      final deck = FactCard.buildDeck();
+      // 2단 카드 하나를 "최근에 틀린 만기"로 설정
+      final target = Progression.homeCards(2, deck).first;
+      target.dueDate = DateTime(2026, 6, 12); // 어제 만기
+      target.consecutiveCorrect = 0; // 틀린 상태
+      target.totalWrong = 1;
+      // 나머지 2단 카드는 익힌 상태(가중치 1)
+      for (final c in Progression.homeCards(2, deck)) {
+        if (c.id == target.id) continue;
+        c.totalCorrect = 3;
+        c.consecutiveCorrect = 3;
+        c.dueDate = DateTime(2026, 12, 31); // 만기 아님
+      }
+      final rng = Random(11);
+      var hits = 0;
+      for (var i = 0; i < 600; i++) {
+        final gate = RunnerEngine.nextGate(deck, DateTime(2026, 6, 13), random: rng);
+        if (gate.card.id == target.id) hits++;
+      }
+      // 균등 추첨이면 약 600/7 ≈ 86회. 가중치(8 vs 1)면 훨씬 많아야 한다.
+      expect(hits, greaterThan(150));
     });
   });
 
