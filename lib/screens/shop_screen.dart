@@ -67,7 +67,7 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Widget _buildPhotoSection(Profile profile) {
-    final hasPhoto = profile.photoPath != null;
+    final hasPhoto = profile.photoPath?.isNotEmpty == true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -143,7 +143,7 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Future<void> _removePhoto() async {
-    await repo.setPhotoPath('');
+    await repo.setPhotoPath(null);
     if (!mounted) return;
     setState(() {});
   }

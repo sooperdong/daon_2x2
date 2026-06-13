@@ -145,15 +145,15 @@ class _RunnerScreenState extends State<RunnerScreen>
 
     if (correct) {
       final newCombo = _combo + 1;
-      final mult = newCombo >= 5 ? 3 : (newCombo >= 3 ? 2 : 1);
+      final mult = _comboMult(newCombo);
       int earned = gate.answer * mult;
 
       // 번개 답변 보너스 (게이트 도착 후 1.5초 이내 정답)
-      int speedBonus = 0;
+      bool isSpeed = false;
       if (_gateArrived && _gateArrivalTime != null) {
         if (now.difference(_gateArrivalTime!).inMilliseconds < 1500) {
-          speedBonus = gate.answer;
-          earned += speedBonus;
+          isSpeed = true;
+          earned += gate.answer;
         }
       }
 
@@ -168,8 +168,9 @@ class _RunnerScreenState extends State<RunnerScreen>
         _score += earned;
         _lastEarned = earned;
         _expr = DajoyExpression.cheer;
-        _gagText = speedBonus > 0
-            ? '⚡ 번개 답변! +$speedBonus'
+        // 번개 답변 시 gag text는 숫자 없이 — 정확한 총합은 피드백 배너에 표시됨
+        _gagText = isSpeed
+            ? '⚡ 번개 답변!'
             : _correctPhrases[_rng.nextInt(_correctPhrases.length)];
       });
     } else {
@@ -202,6 +203,7 @@ class _RunnerScreenState extends State<RunnerScreen>
   }
 
   Future<void> _finish() async {
+    if (_gagText != null) setState(() => _gagText = null);
     final repo = widget.repo;
     final profile = repo.profile;
     final now = DateTime.now();
@@ -544,24 +546,15 @@ class _RunnerScreenState extends State<RunnerScreen>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            const Color(0xFFFFD54F).withValues(alpha: 0.55),
+                        color: const Color(0xFFFFD54F).withValues(alpha: 0.55),
                         blurRadius: 22,
                         spreadRadius: 5,
-                      )
+                      ),
                     ],
                   ),
-                  child: DajoyCharacter(
-                    expression: _expr,
-                    size: 84,
-                    style: style,
-                  ),
+                  child: DajoyCharacter(expression: _expr, size: 84, style: style),
                 )
-              : DajoyCharacter(
-                  expression: _expr,
-                  size: 84,
-                  style: style,
-                ),
+              : DajoyCharacter(expression: _expr, size: 84, style: style),
         ),
       ],
     );
@@ -578,7 +571,7 @@ class _RunnerScreenState extends State<RunnerScreen>
       ),
       child: Text(
         _lastCorrect
-            ? '✨ ${gate.a}×${gate.b}=${gate.answer}${_combo >= 3 ? " ×${_combo >= 5 ? 3 : 2}" : ""}! +$_lastEarned'
+            ? '✨ ${gate.a}×${gate.b}=${gate.answer}${_comboMult(_combo) > 1 ? " ×${_comboMult(_combo)}" : ""}! +$_lastEarned'
             : '${gate.a}×${gate.b}=${gate.answer} 이야!',
         style: const TextStyle(
             color: Colors.white,
@@ -588,6 +581,9 @@ class _RunnerScreenState extends State<RunnerScreen>
     );
   }
 }
+
+/// 콤보 배율: 3연속→×2, 5연속→×3
+int _comboMult(int combo) => combo >= 5 ? 3 : (combo >= 3 ? 2 : 1);
 
 /// 3개 레인 길 배경
 class _LanePainter extends CustomPainter {

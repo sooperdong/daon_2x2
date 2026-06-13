@@ -128,8 +128,13 @@ class GameRepository {
   int totalAttemptedAll() => deck.fold(0, (s, c) => s + c.totalCorrect + c.totalWrong);
 
   // ── 얼굴 사진 (기기 전용) ──────────────────────────────────────────────────
-  Future<void> setPhotoPath(String path) async {
-    await _profile.put('photoPath', path);
-    profile.photoPath = path;
+  Future<void> setPhotoPath(String? path) async {
+    if (path == null || path.isEmpty) {
+      await _profile.delete('photoPath');
+      profile.photoPath = null;
+    } else {
+      await _profile.put('photoPath', path);
+      profile.photoPath = path;
+    }
   }
 }

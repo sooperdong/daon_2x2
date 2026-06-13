@@ -62,20 +62,41 @@ class _DajoyCharacterState extends State<DajoyCharacter> {
     if (old.style.photoPath != widget.style.photoPath) _loadPhoto();
   }
 
+  @override
+  void dispose() {
+    _faceImage?.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadPhoto() async {
     final path = widget.style.photoPath;
     if (path == null || path.isEmpty) {
-      if (mounted) setState(() { _faceImage = null; _loadedPath = null; });
+      if (mounted) {
+        final old = _faceImage;
+        setState(() { _faceImage = null; _loadedPath = null; });
+        old?.dispose();
+      }
       return;
     }
     if (path == _loadedPath) return;
     try {
       final bytes = await File(path).readAsBytes();
+      // Stale check: path may have changed while awaiting I/O
+      if (!mounted || widget.style.photoPath != path) return;
       final codec = await ui.instantiateImageCodec(bytes, targetWidth: 256, targetHeight: 256);
+      if (!mounted || widget.style.photoPath != path) return;
       final frame = await codec.getNextFrame();
-      if (mounted) setState(() { _faceImage = frame.image; _loadedPath = path; });
+      if (mounted && widget.style.photoPath == path) {
+        final old = _faceImage;
+        setState(() { _faceImage = frame.image; _loadedPath = path; });
+        old?.dispose();
+      } else {
+        frame.image.dispose(); // 이미 만료된 요청 — GPU 메모리 즉시 해제
+      }
     } catch (_) {
-      if (mounted) setState(() { _faceImage = null; _loadedPath = null; });
+      if (mounted && widget.style.photoPath == path) {
+        setState(() { _faceImage = null; _loadedPath = null; });
+      }
     }
   }
 
