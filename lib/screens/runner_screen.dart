@@ -121,6 +121,11 @@ class _RunnerScreenState extends State<RunnerScreen>
     _approach
       ..reset()
       ..forward();
+
+    // 처음 등장하는 카드는 암송문으로 한 번 들려준다 (음운 부호화 지원)
+    if (gate.card.isNew) {
+      TtsService.instance.speakChant(chantText(gate.a, gate.b));
+    }
   }
 
   Future<void> _choose(int doorIndex) async {

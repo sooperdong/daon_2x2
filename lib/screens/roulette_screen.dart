@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 import '../data/game_repository.dart';
+import '../data/models/profile.dart';
 import '../engine/roulette.dart';
 import '../widgets/dajoy_character.dart';
 import 'shop_screen.dart' show styleFromProfile;
@@ -94,7 +95,7 @@ class _RouletteScreenState extends State<RouletteScreen>
       profile.piggyBank += prize.won;
       profile.rouletteKkwangStreak = 0;
     }
-    profile.rouletteHistory.add('${DateTime.now().toIso8601String()}:${prize.name}');
+    profile.rouletteHistory.add('roulette|${Profile.dateKey(DateTime.now())}|${prize.name}');
     await repo.saveProfile();
     await repo.logEvent('roulette', {'prize': prize.name}, DateTime.now());
 

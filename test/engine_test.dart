@@ -396,6 +396,30 @@ void main() {
       expect(p.familyCode, isNull);
     });
 
+    test('일일 달리기 한도: 5회까지 가능, 초과 시 canStartRun false', () {
+      final p = Profile();
+      final day1 = DateTime(2026, 7, 1);
+      expect(p.remainingRunsToday(day1), 5);
+      for (var i = 0; i < 5; i++) {
+        expect(p.canStartRun(day1), isTrue);
+        p.recordRunStart(day1);
+      }
+      expect(p.remainingRunsToday(day1), 0);
+      expect(p.canStartRun(day1), isFalse);
+    });
+
+    test('일일 달리기 한도: 날짜가 바뀌면 자동으로 리셋', () {
+      final p = Profile();
+      final day1 = DateTime(2026, 7, 1);
+      final day2 = DateTime(2026, 7, 2);
+      for (var i = 0; i < 5; i++) {
+        p.recordRunStart(day1);
+      }
+      expect(p.canStartRun(day1), isFalse);
+      expect(p.canStartRun(day2), isTrue);
+      expect(p.remainingRunsToday(day2), 5);
+    });
+
     test('가족 코드 생성: 6자리 대문자 영숫자, 혼동 문자 없음', () {
       const bad = {'0', 'O', '1', 'I'};
       for (var i = 0; i < 100; i++) {
@@ -459,6 +483,36 @@ void main() {
         expect(next.card.id == prev.card.id, isFalse);
         prev = next;
       }
+    });
+
+    test('복습 백로그가 쌓여도 새 카드 도입이 끝없이 밀리지 않는다', () {
+      final deck = FactCard.buildDeck();
+      // 2단 클리어 → 5단 해금
+      for (final c in Progression.homeCards(2, deck)) {
+        c.totalCorrect = 1;
+        c.consecutiveCorrect = 1;
+      }
+      // 2단 카드 전부를 무거운 복습 백로그로 설정 (만기 + 절반은 틀린 상태)
+      final dan2 = Progression.homeCards(2, deck);
+      for (var i = 0; i < dan2.length; i++) {
+        dan2[i].dueDate = DateTime(2026, 6, 12); // 어제 만기
+        dan2[i].consecutiveCorrect = i.isEven ? 0 : 1;
+      }
+
+      final rng = Random(5);
+      final introduced = <String>{};
+      final dan5Ids = Progression.homeCards(5, deck).map((c) => c.id).toSet();
+
+      for (var i = 0; i < 300 && introduced.length < dan5Ids.length; i++) {
+        final gate = RunnerEngine.nextGate(deck, DateTime(2026, 6, 13), random: rng);
+        if (dan5Ids.contains(gate.card.id) && gate.card.isNew) {
+          introduced.add(gate.card.id);
+          Sm2Scheduler.review(gate.card, correct: true, now: DateTime(2026, 6, 13));
+        }
+      }
+
+      expect(introduced.length, dan5Ids.length,
+          reason: '무거운 2단 복습 백로그가 있어도 5단 새 카드 ${dan5Ids.length}장이 모두 도입되어야 함');
     });
 
     test('틀린 만기 카드가 익힌 카드보다 자주 나온다 (가중치)', () {

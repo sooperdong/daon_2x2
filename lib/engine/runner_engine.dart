@@ -72,8 +72,21 @@ class RunnerEngine {
     );
   }
 
+  /// 새 카드를 강제로 도입할 확률 — 복습 백로그가 쌓여도 아직 한 번도
+  /// 안 배운 카드가 영원히 밀리지 않도록 보장한다 (단 진행 정체 방지).
+  static const double _newCardIntroRate = 0.4;
+
   /// 학습 필요도 가중치: 틀렸던 카드 > 만기 복습 > 새 카드 > 익힌 카드
   static FactCard _weightedPick(List<FactCard> pool, DateTime today, Random rng) {
+    // 복습 만기 카드가 쌓일수록 새 카드가 가중치 추첨에서 밀려 단 진행이
+    // 멈추는 문제가 있었음 — 새 카드가 있으면 일정 확률로 쉬운 곱부터
+    // 무조건 하나를 도입한다.
+    final fresh = pool.where((c) => c.isNew).toList()
+      ..sort((x, y) => (x.a * x.b).compareTo(y.a * y.b));
+    if (fresh.isNotEmpty && rng.nextDouble() < _newCardIntroRate) {
+      return fresh.first;
+    }
+
     int weightOf(FactCard c) {
       if (c.dueDate != null && !c.dueDate!.isAfter(today)) {
         return c.consecutiveCorrect == 0 ? 8 : 5; // 최근에 틀린 만기 카드 최우선

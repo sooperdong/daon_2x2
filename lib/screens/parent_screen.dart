@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 import '../data/game_repository.dart';
+import '../data/models/profile.dart';
 import '../services/sync_service.dart';
 
 /// 부모 리포트 — PIN 보호 화면.
@@ -406,7 +407,10 @@ class _ParentScreenState extends State<ParentScreen> {
       ),
     );
     if (ok != true) return;
+    final amount = widget.repo.profile.piggyBank;
     widget.repo.profile.piggyBank = 0;
+    widget.repo.profile.rouletteHistory
+        .add('payout|${Profile.dateKey(DateTime.now())}|$amount');
     await widget.repo.saveProfile();
     setState(() {});
   }
@@ -421,17 +425,35 @@ class _ParentScreenState extends State<ParentScreen> {
   }
 
   String _formatRouletteHistory(String h) {
-    // "2026-06-12T10:30:00.000:won100" → "6/12 — 100원 당첨"
+    // 신규 형식: "roulette|2026-07-01|won500" / "payout|2026-07-01|850"
+    if (h.contains('|')) {
+      final parts = h.split('|');
+      if (parts.length < 3) return h;
+      final dateStr = _shortDate(parts[1]);
+      if (parts[0] == 'payout') {
+        return '$dateStr  💸 용돈 지급 완료 (${parts[2]}원)';
+      }
+      return '$dateStr  ${_prizeLabel(parts[2])}';
+    }
+    // 이전 형식(호환): "2026-06-12T10:30:00.000:won100" → "6/12 — 100원 당첨"
     final parts = h.split(':');
     if (parts.length < 2) return h;
     final dateStr = parts.first.substring(5, 10).replaceAll('-', '/'); // MM/DD
-    final prize = parts.last;
-    final label = switch (prize) {
-      'won100' => '100원 당첨 💰',
-      'won1000' => '1000원 당첨 🎉',
-      _ => '꽝',
-    };
-    return '$dateStr  $label';
+    return '$dateStr  ${_prizeLabel(parts.last)}';
+  }
+
+  String _prizeLabel(String prize) => switch (prize) {
+        'won100' => '100원 당첨 💰',
+        'won500' => '500원 당첨 💵',
+        'won1000' => '1000원 당첨 🎉',
+        _ => '꽝',
+      };
+
+  /// "2026-07-01" → "7/1"
+  String _shortDate(String yyyyMMdd) {
+    final parts = yyyyMMdd.split('-');
+    if (parts.length != 3) return yyyyMMdd;
+    return '${int.parse(parts[1])}/${int.parse(parts[2])}';
   }
 }
 

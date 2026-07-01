@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/game_repository.dart';
+import '../data/models/profile.dart';
 import '../engine/progression.dart';
 import '../services/sync_service.dart';
 import '../widgets/dajoy_character.dart';
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final profile = repo.profile;
     final unlocked = Progression.unlockedDans(repo.deck);
     final learning = unlocked.join(', ');
+    final remaining = profile.remainingRunsToday(DateTime.now());
 
     return Scaffold(
       body: Container(
@@ -75,14 +77,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: FilledButton(
                     onPressed: _startRun,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF7B5EA7),
+                      backgroundColor: remaining > 0
+                          ? const Color(0xFF7B5EA7)
+                          : const Color(0xFFB0A8C0),
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24)),
                     ),
-                    child: const Text('🏃 달리기 시작!',
-                        style: TextStyle(
-                            fontSize: 26, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      remaining > 0
+                          ? '🏃 달리기 시작! ($remaining/${Profile.maxRunsPerDay})'
+                          : '🌙 오늘 달리기 완료!',
+                      style: const TextStyle(
+                          fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ),
@@ -153,6 +161,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startRun() async {
+    final now = DateTime.now();
+    if (!repo.profile.canStartRun(now)) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('🌙 오늘 달리기는 다 했어요!'),
+          content: const Text(
+              '내일 다시 만나요! 모아둔 티켓이 있으면 룰렛은 계속 돌릴 수 있어요 🎡'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('알겠어요!'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    repo.profile.recordRunStart(now);
+    await repo.saveProfile();
+    if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => RunnerScreen(repo: repo)),
     );
