@@ -189,7 +189,7 @@ void main() {
   });
 
   group('룰렛', () {
-    test('확률 분포: 꽝 50% / 100원 40% / 1000원 10% (±2%p)', () {
+    test('확률 분포: 꽝 50% / 100원 35% / 500원 10% / 1000원 5% (±2%p, 연속 꽝 0회)', () {
       final rng = Random(123);
       final counts = <RoulettePrize, int>{};
       const trials = 100000;
@@ -198,14 +198,55 @@ void main() {
         counts[p] = (counts[p] ?? 0) + 1;
       }
       expect(counts[RoulettePrize.kkwang]! / trials, closeTo(0.5, 0.02));
-      expect(counts[RoulettePrize.won100]! / trials, closeTo(0.4, 0.02));
-      expect(counts[RoulettePrize.won1000]! / trials, closeTo(0.1, 0.02));
+      expect(counts[RoulettePrize.won100]! / trials, closeTo(0.35, 0.02));
+      expect(counts[RoulettePrize.won500]! / trials, closeTo(0.10, 0.02));
+      expect(counts[RoulettePrize.won1000]! / trials, closeTo(0.05, 0.02));
     });
 
     test('상금 매핑', () {
       expect(RoulettePrize.kkwang.won, 0);
       expect(RoulettePrize.won100.won, 100);
+      expect(RoulettePrize.won500.won, 500);
       expect(RoulettePrize.won1000.won, 1000);
+    });
+
+    test('동정 보정: 연속 꽝이 쌓일수록 꽝 확률이 내려간다', () {
+      final rng = Random(7);
+      const trials = 50000;
+
+      int kkwangCount(int streak) {
+        var count = 0;
+        for (var i = 0; i < trials; i++) {
+          if (Roulette.spin(rng, kkwangStreak: streak) == RoulettePrize.kkwang) count++;
+        }
+        return count;
+      }
+
+      final at0 = kkwangCount(0) / trials;
+      final at3 = kkwangCount(3) / trials;
+      final at7 = kkwangCount(7) / trials;
+      final at20 = kkwangCount(20) / trials; // 상한 초과
+
+      expect(at0, closeTo(0.5, 0.02));
+      expect(at3, closeTo(0.35, 0.02)); // 50% - 3*5%p
+      expect(at7, closeTo(0.15, 0.02)); // 50% - 최대 35%p 감소 = 15%
+      expect(at20, closeTo(at7, 0.02)); // 상한 이후로는 더 내려가지 않음
+    });
+
+    test('동정 보정이 적용돼도 확률 총합은 항상 1', () {
+      final rng = Random(9);
+      for (final streak in [0, 1, 3, 5, 7, 10, 50]) {
+        final counts = <RoulettePrize, int>{};
+        const trials = 20000;
+        for (var i = 0; i < trials; i++) {
+          final p = Roulette.spin(rng, kkwangStreak: streak);
+          counts[p] = (counts[p] ?? 0) + 1;
+        }
+        final total = RoulettePrize.values
+            .map((p) => counts[p] ?? 0)
+            .fold(0, (a, b) => a + b);
+        expect(total, trials);
+      }
     });
   });
 

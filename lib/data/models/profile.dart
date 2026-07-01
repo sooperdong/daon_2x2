@@ -9,6 +9,7 @@ class Profile {
   int streak;
   String? lastPlayDate; // yyyy-MM-dd
   int rouletteTickets;
+  int rouletteKkwangStreak; // 연속 꽝 횟수 — 다음 스핀 동정 보정(pity)에 사용
   List<int> masteredDans;
   List<String> rouletteHistory; // "2026-06-12:won100"
   List<String> ownedItems;
@@ -32,6 +33,7 @@ class Profile {
     this.streak = 0,
     this.lastPlayDate,
     this.rouletteTickets = 0,
+    this.rouletteKkwangStreak = 0,
     List<int>? masteredDans,
     List<String>? rouletteHistory,
     List<String>? ownedItems,
@@ -87,6 +89,7 @@ class Profile {
         'streak': streak,
         'lastPlayDate': lastPlayDate,
         'rouletteTickets': rouletteTickets,
+        'rouletteKkwangStreak': rouletteKkwangStreak,
         'masteredDans': masteredDans,
         'rouletteHistory': rouletteHistory,
         'ownedItems': ownedItems,
@@ -105,6 +108,7 @@ class Profile {
         streak: json['streak'] as int,
         lastPlayDate: json['lastPlayDate'] as String?,
         rouletteTickets: json['rouletteTickets'] as int,
+        rouletteKkwangStreak: json['rouletteKkwangStreak'] as int? ?? 0,
         masteredDans: (json['masteredDans'] as List).cast<int>(),
         rouletteHistory: (json['rouletteHistory'] as List).cast<String>(),
         ownedItems: (json['ownedItems'] as List?)?.cast<String>(),

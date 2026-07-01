@@ -8,9 +8,10 @@ import '../engine/roulette.dart';
 import '../widgets/dajoy_character.dart';
 import 'shop_screen.dart' show styleFromProfile;
 
-/// 마법 룰렛 — 꽝 50% / 100원 40% / 1000원 10%.
+/// 마법 룰렛 — 꽝 50% / 100원 35% / 500원 10% / 1000원 5%.
 /// 당첨금은 저금통에 쌓이고 부모가 실제 현금으로 전달한다.
 /// 꽝이어도 별 조각 위로 선물 — "완전 꽝"은 없다.
+/// 꽝이 연속되면 다음 스핀의 당첨 확률이 조금씩 올라간다(동정 보정).
 class RouletteScreen extends StatefulWidget {
   final GameRepository repo;
 
@@ -30,11 +31,12 @@ class _RouletteScreenState extends State<RouletteScreen>
   bool _spinning = false;
   double _baseAngle = 0; // 직전 스핀의 정지 각도 — 다음 스핀이 0도로 튕기지 않게
 
-  // 휠 섹터: 꽝 180°(50%) / 100원 144°(40%) / 1000원 36°(10%)
+  // 휠 섹터: 꽝 50% / 100원 35% / 500원 10% / 1000원 5% (기본 비율, 동정 보정 전)
   static const _sectors = [
     (RoulettePrize.kkwang, 0.5, Color(0xFFB0BEC5), '꽝'),
-    (RoulettePrize.won100, 0.4, Color(0xFF81C784), '100원'),
-    (RoulettePrize.won1000, 0.1, Color(0xFFFFB300), '1000원'),
+    (RoulettePrize.won100, 0.35, Color(0xFF81C784), '100원'),
+    (RoulettePrize.won500, 0.1, Color(0xFFFF8A65), '500원'),
+    (RoulettePrize.won1000, 0.05, Color(0xFFFFB300), '1000원'),
   ];
 
   @override
@@ -53,7 +55,8 @@ class _RouletteScreenState extends State<RouletteScreen>
   Future<void> _spin() async {
     if (_spinning || widget.repo.profile.rouletteTickets <= 0) return;
 
-    final prize = Roulette.spin(_rng);
+    final prize = Roulette.spin(_rng,
+        kkwangStreak: widget.repo.profile.rouletteKkwangStreak);
 
     // 당첨 섹터 중앙 각도 계산 (포인터는 12시 방향)
     var start = 0.0;
@@ -86,8 +89,10 @@ class _RouletteScreenState extends State<RouletteScreen>
     profile.rouletteTickets--;
     if (prize == RoulettePrize.kkwang) {
       profile.starPieces += starPiecesConsolation;
+      profile.rouletteKkwangStreak++;
     } else {
       profile.piggyBank += prize.won;
+      profile.rouletteKkwangStreak = 0;
     }
     profile.rouletteHistory.add('${DateTime.now().toIso8601String()}:${prize.name}');
     await repo.saveProfile();
@@ -171,6 +176,7 @@ class _RouletteScreenState extends State<RouletteScreen>
     final (text, color) = switch (prize) {
       RoulettePrize.kkwang => ('아쉽다! 위로 선물 별 조각 +$starPiecesConsolation ⭐', Colors.blueGrey),
       RoulettePrize.won100 => ('💰 100원 GET! 저금통에 쌓였어!', const Color(0xFF2E7D32)),
+      RoulettePrize.won500 => ('💵 500원 GET! 저금통이 두꺼워졌어!', const Color(0xFFE65100)),
       RoulettePrize.won1000 => ('🎉 대박!! 1000원 당첨!! 김다조이 부자다!', const Color(0xFFE65100)),
     };
     return Text(text,
