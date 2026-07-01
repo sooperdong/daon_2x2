@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -17,18 +17,18 @@ class DajoyStyle {
   final Color ribbonColor;
   final String? hatId;    // hat_wizard / hat_crown / hat_flower
   final String? faceId;   // face_glasses / face_star
-  final String? photoPath; // 기기 로컬 사진 경로 (절대 동기화 안 됨)
+  final Uint8List? photoBytes; // 기기 로컬 사진 바이트 (절대 동기화 안 됨, 모바일/웹 공통)
 
   const DajoyStyle({
     this.ribbonColor = const Color(0xFFFF8FAB),
     this.hatId,
     this.faceId,
-    this.photoPath,
+    this.photoBytes,
   });
 }
 
 /// 김다조이 캐릭터.
-/// photoPath가 있으면 실제 아이 얼굴 사진이 원형으로 표시되고
+/// photoBytes가 있으면 실제 아이 얼굴 사진이 원형으로 표시되고
 /// 머리/핀/모자는 그 위에 그려진다.
 class DajoyCharacter extends StatefulWidget {
   final DajoyExpression expression;
@@ -48,18 +48,18 @@ class DajoyCharacter extends StatefulWidget {
 
 class _DajoyCharacterState extends State<DajoyCharacter> {
   ui.Image? _faceImage;
-  String? _loadedPath;
+  Uint8List? _loadedBytes;
 
   @override
   void initState() {
     super.initState();
-    _loadPhoto();
+    _decodePhoto();
   }
 
   @override
   void didUpdateWidget(DajoyCharacter old) {
     super.didUpdateWidget(old);
-    if (old.style.photoPath != widget.style.photoPath) _loadPhoto();
+    if (old.style.photoBytes != widget.style.photoBytes) _decodePhoto();
   }
 
   @override
@@ -68,34 +68,32 @@ class _DajoyCharacterState extends State<DajoyCharacter> {
     super.dispose();
   }
 
-  Future<void> _loadPhoto() async {
-    final path = widget.style.photoPath;
-    if (path == null || path.isEmpty) {
+  Future<void> _decodePhoto() async {
+    final bytes = widget.style.photoBytes;
+    if (bytes == null || bytes.isEmpty) {
       if (mounted) {
         final old = _faceImage;
-        setState(() { _faceImage = null; _loadedPath = null; });
+        setState(() { _faceImage = null; _loadedBytes = null; });
         old?.dispose();
       }
       return;
     }
-    if (path == _loadedPath) return;
+    if (bytes == _loadedBytes) return;
     try {
-      final bytes = await File(path).readAsBytes();
-      // Stale check: path may have changed while awaiting I/O
-      if (!mounted || widget.style.photoPath != path) return;
       final codec = await ui.instantiateImageCodec(bytes, targetWidth: 256, targetHeight: 256);
-      if (!mounted || widget.style.photoPath != path) return;
+      // Stale check: bytes may have changed while awaiting decode
+      if (!mounted || widget.style.photoBytes != bytes) return;
       final frame = await codec.getNextFrame();
-      if (mounted && widget.style.photoPath == path) {
+      if (mounted && widget.style.photoBytes == bytes) {
         final old = _faceImage;
-        setState(() { _faceImage = frame.image; _loadedPath = path; });
+        setState(() { _faceImage = frame.image; _loadedBytes = bytes; });
         old?.dispose();
       } else {
         frame.image.dispose(); // 이미 만료된 요청 — GPU 메모리 즉시 해제
       }
     } catch (_) {
-      if (mounted && widget.style.photoPath == path) {
-        setState(() { _faceImage = null; _loadedPath = null; });
+      if (mounted && widget.style.photoBytes == bytes) {
+        setState(() { _faceImage = null; _loadedBytes = null; });
       }
     }
   }
@@ -358,6 +356,6 @@ class _DajoyPainter extends CustomPainter {
       oldDelegate.style.ribbonColor != style.ribbonColor ||
       oldDelegate.style.hatId != style.hatId ||
       oldDelegate.style.faceId != style.faceId ||
-      oldDelegate.style.photoPath != style.photoPath ||
+      oldDelegate.style.photoBytes != style.photoBytes ||
       oldDelegate.facePhoto != facePhoto;
 }

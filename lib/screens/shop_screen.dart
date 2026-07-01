@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -67,7 +65,7 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Widget _buildPhotoSection(Profile profile) {
-    final hasPhoto = profile.photoPath?.isNotEmpty == true;
+    final hasPhoto = profile.photoBytes?.isNotEmpty == true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -94,8 +92,8 @@ class _ShopScreenState extends State<ShopScreen> {
               children: [
                 if (hasPhoto)
                   ClipOval(
-                    child: Image.file(
-                      File(profile.photoPath!),
+                    child: Image.memory(
+                      profile.photoBytes!,
                       width: 48,
                       height: 48,
                       fit: BoxFit.cover,
@@ -138,12 +136,14 @@ class _ShopScreenState extends State<ShopScreen> {
       imageQuality: 85,
     );
     if (image == null || !mounted) return;
-    await repo.setPhotoPath(image.path);
+    final bytes = await image.readAsBytes();
+    if (!mounted) return;
+    await repo.setPhotoBytes(bytes);
     setState(() {});
   }
 
   Future<void> _removePhoto() async {
-    await repo.setPhotoPath(null);
+    await repo.setPhotoBytes(null);
     if (!mounted) return;
     setState(() {});
   }
@@ -215,6 +215,6 @@ DajoyStyle styleFromProfile(Profile profile) {
     ribbonColor: ribbon?.color ?? const Color(0xFFFF8FAB),
     hatId: profile.equipped[ItemSlot.hat.name],
     faceId: profile.equipped[ItemSlot.face.name],
-    photoPath: (profile.photoPath?.isNotEmpty == true) ? profile.photoPath : null,
+    photoBytes: (profile.photoBytes?.isNotEmpty == true) ? profile.photoBytes : null,
   );
 }

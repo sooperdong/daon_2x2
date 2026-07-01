@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -38,7 +39,9 @@ class GameRepository {
 
     final p = _profile.get('me');
     profile = p == null ? Profile() : Profile.fromJson(jsonDecode(p) as Map<String, dynamic>);
-    profile.photoPath = _profile.get('photoPath'); // 기기 전용 — 직렬화 밖에서 보관
+    // 기기 전용 — 직렬화 밖에서 보관. 웹/모바일 공통으로 바이트 저장.
+    final photoB64 = _profile.get('photoBytes');
+    profile.photoBytes = photoB64 == null ? null : base64Decode(photoB64);
   }
 
   Future<void> saveCard(FactCard card) async {
@@ -127,14 +130,14 @@ class GameRepository {
   /// 전체 시도 수 (첫 시도 기준)
   int totalAttemptedAll() => deck.fold(0, (s, c) => s + c.totalCorrect + c.totalWrong);
 
-  // ── 얼굴 사진 (기기 전용) ──────────────────────────────────────────────────
-  Future<void> setPhotoPath(String? path) async {
-    if (path == null || path.isEmpty) {
-      await _profile.delete('photoPath');
-      profile.photoPath = null;
+  // ── 얼굴 사진 (기기 전용, 모바일/웹 공통) ────────────────────────────────────
+  Future<void> setPhotoBytes(Uint8List? bytes) async {
+    if (bytes == null || bytes.isEmpty) {
+      await _profile.delete('photoBytes');
+      profile.photoBytes = null;
     } else {
-      await _profile.put('photoPath', path);
-      profile.photoPath = path;
+      await _profile.put('photoBytes', base64Encode(bytes));
+      profile.photoBytes = bytes;
     }
   }
 }

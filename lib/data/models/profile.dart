@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// 김다조이의 영구 진행 데이터 — 레벨, 재화, 스트릭, 룰렛
 class Profile {
   int level;
@@ -19,7 +21,8 @@ class Profile {
   List<String> playDates; // 출석한 날 yyyy-MM-dd (최근 90일)
 
   // 기기 전용 — 절대 Firebase 동기화 안 됨. toJson에 포함되지 않는다.
-  String? photoPath;
+  // 파일 경로 대신 바이트로 보관 → 모바일/웹 공통 코드로 동작
+  Uint8List? photoBytes;
 
   Profile({
     this.level = 1,
