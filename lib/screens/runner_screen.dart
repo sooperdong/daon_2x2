@@ -7,7 +7,6 @@ import '../data/game_repository.dart';
 import '../engine/progression.dart';
 import '../engine/runner_engine.dart';
 import '../engine/sm2_scheduler.dart';
-import '../services/tts_service.dart';
 import '../widgets/dajoy_character.dart';
 import 'result_screen.dart';
 import 'shop_screen.dart' show styleFromProfile;
@@ -98,7 +97,6 @@ class _RunnerScreenState extends State<RunnerScreen>
     _approachCurved.dispose();
     _approach.dispose();
     _shake.dispose();
-    TtsService.instance.stop();
     super.dispose();
   }
 
@@ -121,11 +119,6 @@ class _RunnerScreenState extends State<RunnerScreen>
     _approach
       ..reset()
       ..forward();
-
-    // 처음 등장하는 카드는 암송문으로 한 번 들려준다 (음운 부호화 지원)
-    if (gate.card.isNew) {
-      TtsService.instance.speakChant(chantText(gate.a, gate.b));
-    }
   }
 
   Future<void> _choose(int doorIndex) async {
@@ -191,8 +184,6 @@ class _RunnerScreenState extends State<RunnerScreen>
         _gagText = _wrongPhrases[_rng.nextInt(_wrongPhrases.length)];
       });
       _shake.forward(from: 0);
-      TtsService.instance.speak(
-          '${card.a} 곱하기 ${card.b}${_eunNeun(card.b)} ${card.answer}');
     }
 
     await Future.delayed(Duration(milliseconds: correct ? 750 : 1700));
@@ -605,12 +596,6 @@ class _LanePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_LanePainter oldDelegate) => false;
-}
-
-/// 숫자 b에 맞는 조사 (은/는) — TTS용
-String _eunNeun(int b) {
-  const map = {1: '은', 2: '는', 3: '은', 6: '은', 7: '은', 8: '은'};
-  return map[b] ?? '';
 }
 
 double _lerp(double a, double b, double t) => a + (b - a) * t;

@@ -7,7 +7,6 @@ import 'data/game_repository.dart';
 import 'screens/home_screen.dart';
 import 'services/firebase_sync.dart';
 import 'services/sync_service.dart';
-import 'services/tts_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,8 +17,6 @@ Future<void> main() async {
     await Firebase.initializeApp();
     sync = FirebaseSyncService();
   } catch (_) {}
-
-  await TtsService.instance.init();
 
   final repo = GameRepository();
   await repo.init();
