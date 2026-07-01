@@ -21,8 +21,9 @@ const _wrongPhrases = [
 
 /// 콤보 러너 — 곱셈이 곧 게임 메커니즘.
 /// 연속 정답이 쌓이면 콤보가 올라가고 별가루 배율이 늘어난다.
-/// 게이트가 빠르게 달려들수록 화면이 붉게 물들며 긴장감을 준다.
-/// 틀려도 죽지 않는다(no-fail) — 콤보만 리셋된다.
+/// 게이트가 결정선을 지나 위험선까지 떨어지는 동안 답하지 못하면(시간 초과)
+/// 목숨이 하나 깎인다. 하지만 목숨이 0이 되어도 게임이 끝나지 않고
+/// 코믹하게 위기를 탈출한 뒤 목숨을 회복한다 — 진짜 실패는 없다(no-fail).
 class RunnerScreen extends StatefulWidget {
   final GameRepository repo;
 
@@ -36,12 +37,17 @@ class _RunnerScreenState extends State<RunnerScreen>
     with TickerProviderStateMixin {
   final _rng = Random();
 
-  // 게이트가 위에서 내려오는 연출 — Curves.easeIn 으로 마지막에 확 달려든다
+  // 게이트가 위에서 결정선까지 내려오는 연출 — Curves.easeIn 으로 마지막에 확 달려든다
   late final AnimationController _approach;
   late final CurvedAnimation _approachCurved;
 
-  // 오답 시 캐릭터 흔들기
+  // 결정선에서 위험선까지 계속 떨어지는 2단계 — 시간 초과 압박
+  late final AnimationController _descent;
+
+  // 오답/시간초과 시 캐릭터 흔들기
   late final AnimationController _shake;
+
+  static const int _maxLives = 3;
 
   RunnerGate? _gate;
   int _gateNo = 0;
@@ -51,6 +57,8 @@ class _RunnerScreenState extends State<RunnerScreen>
   int _correct = 0;
   int _wrong = 0;
   int _lastEarned = 0; // 마지막 답변으로 얻은 별가루
+  int _lives = _maxLives;
+  bool _rescuing = false; // 목숨 0 → 코믹 탈출 연출 중
 
   int? _chosen;
   bool _showFeedback = false;
@@ -77,6 +85,10 @@ class _RunnerScreenState extends State<RunnerScreen>
       parent: _approach,
       curve: Curves.easeIn,
     );
+    _descent = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    );
     _shake = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 380),
@@ -87,7 +99,13 @@ class _RunnerScreenState extends State<RunnerScreen>
           _gateArrived = true;
           _gateArrivalTime = DateTime.now();
         });
+        _descent
+          ..reset()
+          ..forward();
       }
+    });
+    _descent.addStatusListener((status) {
+      if (status == AnimationStatus.completed) _onTimeout();
     });
     _loadGate();
   }
@@ -96,6 +114,7 @@ class _RunnerScreenState extends State<RunnerScreen>
   void dispose() {
     _approachCurved.dispose();
     _approach.dispose();
+    _descent.dispose();
     _shake.dispose();
     super.dispose();
   }
@@ -116,6 +135,7 @@ class _RunnerScreenState extends State<RunnerScreen>
       _gateArrivalTime = null;
       _expr = DajoyExpression.focus;
     });
+    _descent.reset();
     _approach
       ..reset()
       ..forward();
@@ -124,6 +144,7 @@ class _RunnerScreenState extends State<RunnerScreen>
   Future<void> _choose(int doorIndex) async {
     final gate = _gate;
     if (gate == null || _busy || _chosen != null) return;
+    _descent.stop(); // 답을 고른 순간 낙하를 멈춘다 — "딱 잡았다" 느낌
 
     final correct = doorIndex == gate.correctIndex;
     final card = gate.card;
@@ -198,6 +219,55 @@ class _RunnerScreenState extends State<RunnerScreen>
     }
   }
 
+  /// 게이트가 위험선까지 떨어졌는데 아직 답하지 않은 경우 — 시간 초과.
+  /// 목숨을 하나 깎지만, 0이 되어도 게임을 끝내지 않고 코믹하게 탈출시킨다.
+  Future<void> _onTimeout() async {
+    final gate = _gate;
+    if (gate == null || _busy || _chosen != null || !mounted) return;
+
+    final card = gate.card;
+    final now = DateTime.now();
+
+    if (!_firstSeen.contains(card.id)) {
+      _firstSeen.add(card.id);
+      Sm2Scheduler.review(card, correct: false, now: now);
+      await widget.repo.saveCard(card);
+    }
+    await widget.repo.logAnswer(
+      cardId: card.id,
+      correct: false,
+      firstAttempt: true,
+      at: now,
+    );
+
+    final ranOut = _lives <= 1;
+    setState(() {
+      _busy = true;
+      _showFeedback = true;
+      _lastCorrect = false;
+      _wrong++;
+      _combo = 0;
+      _lastEarned = 0;
+      _expr = DajoyExpression.silly;
+      _gagText = '⏰ 시간 초과!';
+      _lives = ranOut ? _maxLives : _lives - 1; // 0이 되면 즉시 회복(코믹 탈출)
+      _rescuing = ranOut;
+    });
+    _shake.forward(from: 0);
+
+    await Future.delayed(Duration(milliseconds: ranOut ? 2200 : 1700));
+    if (!mounted) return;
+    if (_rescuing) setState(() => _rescuing = false);
+
+    _gateNo++;
+    if (_gateNo >= RunnerEngine.gatesPerRun) {
+      await _finish();
+    } else {
+      setState(() => _busy = false);
+      _loadGate();
+    }
+  }
+
   Future<void> _finish() async {
     if (_gagText != null) setState(() => _gagText = null);
     final repo = widget.repo;
@@ -250,10 +320,13 @@ class _RunnerScreenState extends State<RunnerScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: AnimatedBuilder(
-        animation: _approachCurved,
+        animation: Listenable.merge([_approachCurved, _descent]),
         builder: (ctx, child) {
-          // 게이트가 가까워질수록 (0.65 이후) 배경이 붉게 변한다 — 긴장감
-          final u = ((_approachCurved.value - 0.65) / 0.35).clamp(0.0, 1.0);
+          // 1단계: 게이트가 가까워질수록(0.65 이후) 붉어짐.
+          // 2단계(결정선 통과 후): 위험선에 가까워질수록 더 진하게 붉어짐 — 긴장감 최고조
+          final u = _gateArrived
+              ? _descent.value
+              : ((_approachCurved.value - 0.65) / 0.35).clamp(0.0, 1.0);
           return Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -291,6 +364,7 @@ class _RunnerScreenState extends State<RunnerScreen>
             icon: const Icon(Icons.close, color: Colors.white),
             tooltip: '그만하기',
           ),
+          _buildLives(),
           const Spacer(),
           _hudChip('✨', '$_score'),
           if (_combo >= 2) ...[
@@ -302,6 +376,19 @@ class _RunnerScreenState extends State<RunnerScreen>
               '${(_gateNo + 1).clamp(1, RunnerEngine.gatesPerRun)}/${RunnerEngine.gatesPerRun}'),
         ],
       ),
+    );
+  }
+
+  Widget _buildLives() {
+    return Row(
+      children: [
+        for (var i = 0; i < _maxLives; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 1),
+            child: Text(i < _lives ? '❤️' : '🖤',
+                style: const TextStyle(fontSize: 20)),
+          ),
+      ],
     );
   }
 
@@ -324,17 +411,31 @@ class _RunnerScreenState extends State<RunnerScreen>
         final h = constraints.maxHeight;
         final w = constraints.maxWidth;
         final decisionY = h * 0.30;
+        final dangerY = h * 0.78;
         final gate = _gate;
 
         return Stack(
           children: [
             Positioned.fill(child: CustomPaint(painter: _LanePainter())),
 
+            // 위험선 — 여기까지 떨어지면 시간 초과
+            Positioned(
+              top: dangerY,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 3,
+                color: Colors.redAccent.withValues(alpha: 0.55),
+              ),
+            ),
+
             if (gate != null)
               AnimatedBuilder(
-                animation: _approachCurved,
+                animation: Listenable.merge([_approachCurved, _descent]),
                 builder: (context, child) {
-                  final top = _lerp(-h * 0.32, decisionY, _approachCurved.value);
+                  final top = _gateArrived
+                      ? _lerp(decisionY, dangerY, _descent.value)
+                      : _lerp(-h * 0.32, decisionY, _approachCurved.value);
                   return Positioned(
                       top: top, left: 0, right: 0, child: child!);
                 },
@@ -378,6 +479,28 @@ class _RunnerScreenState extends State<RunnerScreen>
                             blurRadius: 6,
                             offset: Offset(1, 2))
                       ],
+                    ),
+                  ),
+                ),
+              ),
+
+            // 목숨 0 → 코믹 탈출 연출 (실제로는 게임이 끝나지 않는다)
+            if (_rescuing)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  child: Center(
+                    child: Text(
+                      '😱💥 위험했다!!\n하지만 무사 탈출!! ✨',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFE65100),
+                        shadows: const [
+                          Shadow(color: Colors.black26, blurRadius: 4),
+                        ],
+                      ),
                     ),
                   ),
                 ),
